@@ -12,8 +12,6 @@ export type ZoneName =
 export interface Zone {
   id: string;
   name: ZoneName;
-  districtsCount: number;
-  coordinatorsCount: number;
   status: "Active" | "Inactive";
 }
 
@@ -28,17 +26,20 @@ export interface District {
   currentCoordinatorId?: string;
 }
 
+export type CoordinatorType = "Zonal" | "District";
+
 export interface Coordinator {
   id: string;
   name: string;
   phone: string;
   address: string;
   education?: string;
+  coordinatorType: CoordinatorType;
   joiningDate: string;
   endDate?: string;
   zone: ZoneName;
-  districtId: string;
-  districtName: string;
+  districtId?: string;
+  districtName?: string;
   status: "Active" | "Expired";
   totalActivities?: number;
   attendanceRate?: number;

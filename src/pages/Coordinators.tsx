@@ -12,7 +12,7 @@ import { useCoordinators, useCreateCoordinator, useUpdateCoordinator, useDeleteC
 import { Search, Plus, Edit, Trash2, UserCheck, UserX } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import type { Coordinator, ZoneName } from "@/types";
+import type { Coordinator, ZoneName, CoordinatorType } from "@/types";
 
 export default function Coordinators() {
   const [search, setSearch] = useState("");
@@ -40,6 +40,7 @@ export default function Coordinators() {
   const [formJoiningDate, setFormJoiningDate] = useState("");
   const [formEndDate, setFormEndDate] = useState("");
   const [formStatus, setFormStatus] = useState<"Active" | "Expired">("Active");
+  const [formCoordinatorType, setFormCoordinatorType] = useState<CoordinatorType>("District");
 
   if (cL || zL || dL) return <AppLayout><LoadingSkeleton /></AppLayout>;
 
@@ -55,7 +56,7 @@ export default function Coordinators() {
   const resetForm = () => {
     setFormName(""); setFormPhone(""); setFormAddress(""); setFormEducation("");
     setFormZone(""); setFormDistrictId(""); setFormJoiningDate(""); setFormEndDate("");
-    setFormStatus("Active"); setEditingCoordinator(null);
+    setFormStatus("Active"); setFormCoordinatorType("District"); setEditingCoordinator(null);
   };
 
   const openAddDialog = () => { resetForm(); setDialogOpen(true); };
@@ -63,21 +64,28 @@ export default function Coordinators() {
   const openEditDialog = (c: Coordinator) => {
     setEditingCoordinator(c);
     setFormName(c.name); setFormPhone(c.phone); setFormAddress(c.address);
-    setFormEducation(c.education || ""); setFormZone(c.zone); setFormDistrictId(c.districtId);
+    setFormEducation(c.education || ""); setFormZone(c.zone); setFormDistrictId(c.districtId || "");
     setFormJoiningDate(c.joiningDate); setFormEndDate(c.endDate || ""); setFormStatus(c.status);
+    setFormCoordinatorType(c.coordinatorType || "District");
     setDialogOpen(true);
   };
 
   const handleSave = async () => {
-    if (!formName || !formPhone || !formZone || !formDistrictId || !formJoiningDate) {
+    if (!formName || !formPhone || !formZone || !formJoiningDate) {
       toast({ title: "Missing fields", description: "Please fill all required fields.", variant: "destructive" });
       return;
     }
-    const district = districts.find(d => d.id === formDistrictId);
+    if (formCoordinatorType === "District" && !formDistrictId) {
+      toast({ title: "Missing district", description: "Please select a district for District Coordinator.", variant: "destructive" });
+      return;
+    }
+    const district = formDistrictId ? districts.find(d => d.id === formDistrictId) : undefined;
     const payload = {
       name: formName, phone: formPhone, address: formAddress,
-      education: formEducation || undefined, zone: formZone as ZoneName,
-      districtId: formDistrictId, districtName: district?.name || "",
+      education: formEducation || undefined, coordinatorType: formCoordinatorType,
+      zone: formZone as ZoneName,
+      districtId: formCoordinatorType === "District" ? formDistrictId : undefined,
+      districtName: formCoordinatorType === "District" ? (district?.name || "") : undefined,
       joiningDate: formJoiningDate, endDate: formEndDate || undefined, status: formStatus,
       totalActivities: 0, attendanceRate: 0,
     };
@@ -163,26 +171,25 @@ export default function Coordinators() {
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>Zone</TableHead><TableHead>District</TableHead>
-                  <TableHead>Joined</TableHead><TableHead>End Date</TableHead><TableHead>Activities</TableHead><TableHead>Attendance</TableHead>
-                  <TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead>
-                </TableRow>
+                 <TableRow>
+                   <TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>Type</TableHead><TableHead>Zone</TableHead><TableHead>District</TableHead>
+                   <TableHead>Joined</TableHead><TableHead>End Date</TableHead>
+                   <TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead>
+                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No coordinators found</TableCell></TableRow>
-                ) : filtered.map(c => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium">{c.name}</TableCell>
-                    <TableCell className="text-sm">{c.phone}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{c.zone}</TableCell>
-                    <TableCell className="text-sm">{c.districtName}</TableCell>
-                    <TableCell className="text-sm">{c.joiningDate}</TableCell>
-                    <TableCell className="text-sm">{c.endDate || "—"}</TableCell>
-                    <TableCell className="text-sm">{c.totalActivities || 0}</TableCell>
-                    <TableCell className="text-sm">{c.attendanceRate ? `${c.attendanceRate}%` : "—"}</TableCell>
-                    <TableCell><Badge variant={c.status === "Active" ? "default" : "secondary"} className="text-[10px]">{c.status}</Badge></TableCell>
+                 {filtered.length === 0 ? (
+                   <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No coordinators found</TableCell></TableRow>
+                 ) : filtered.map(c => (
+                   <TableRow key={c.id}>
+                     <TableCell className="font-medium">{c.name}</TableCell>
+                     <TableCell className="text-sm"><Badge variant={c.coordinatorType === "Zonal" ? "default" : "outline"} className="text-[10px]">{c.coordinatorType || "District"}</Badge></TableCell>
+                     <TableCell className="text-muted-foreground text-sm">{c.zone}</TableCell>
+                     <TableCell className="text-sm">{c.districtName || "—"}</TableCell>
+                     <TableCell className="text-sm">{c.phone}</TableCell>
+                     <TableCell className="text-sm">{c.joiningDate}</TableCell>
+                     <TableCell className="text-sm">{c.endDate || "—"}</TableCell>
+                     <TableCell><Badge variant={c.status === "Active" ? "default" : "secondary"} className="text-[10px]">{c.status}</Badge></TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleToggleStatus(c)} title={c.status === "Active" ? "Mark Expired" : "Reactivate"}>
@@ -213,28 +220,36 @@ export default function Coordinators() {
             </div>
             <div className="space-y-1.5"><Label>Address</Label><Input value={formAddress} onChange={e => setFormAddress(e.target.value)} placeholder="Full address" /></div>
             <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Coordinator Type *</Label>
+                <Select value={formCoordinatorType} onValueChange={(v) => { setFormCoordinatorType(v as CoordinatorType); if (v === "Zonal") setFormDistrictId(""); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="Zonal">Zonal Coordinator</SelectItem><SelectItem value="District">District Coordinator</SelectItem></SelectContent>
+                </Select>
+              </div>
               <div className="space-y-1.5"><Label>Education</Label><Input value={formEducation} onChange={e => setFormEducation(e.target.value)} placeholder="e.g. BS Computer Science" /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5"><Label>Status</Label>
                 <Select value={formStatus} onValueChange={(v) => setFormStatus(v as "Active" | "Expired")}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent><SelectItem value="Active">Active</SelectItem><SelectItem value="Expired">Expired</SelectItem></SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5"><Label>Zone *</Label>
                 <Select value={formZone} onValueChange={(v) => { setFormZone(v as ZoneName); setFormDistrictId(""); }}>
                   <SelectTrigger><SelectValue placeholder="Select zone" /></SelectTrigger>
                   <SelectContent>{zones.map(z => <SelectItem key={z.id} value={z.name}>{z.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
+            </div>
+            {formCoordinatorType === "District" && (
               <div className="space-y-1.5"><Label>District *</Label>
                 <Select value={formDistrictId} onValueChange={setFormDistrictId} disabled={!formZone}>
                   <SelectTrigger><SelectValue placeholder="Select district" /></SelectTrigger>
                   <SelectContent>{zoneDistricts.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-            </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5"><Label>Joining Date *</Label><Input type="date" value={formJoiningDate} onChange={e => setFormJoiningDate(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>End Date</Label><Input type="date" value={formEndDate} onChange={e => setFormEndDate(e.target.value)} /></div>
