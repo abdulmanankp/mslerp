@@ -12,8 +12,6 @@ export type ZoneName =
 export interface Zone {
   id: string;
   name: ZoneName;
-  districtsCount: number;
-  coordinatorsCount: number;
   status: "Active" | "Inactive";
 }
 
