@@ -40,6 +40,7 @@ export default function Coordinators() {
   const [formJoiningDate, setFormJoiningDate] = useState("");
   const [formEndDate, setFormEndDate] = useState("");
   const [formStatus, setFormStatus] = useState<"Active" | "Expired">("Active");
+  const [formCoordinatorType, setFormCoordinatorType] = useState<CoordinatorType>("District");
 
   if (cL || zL || dL) return <AppLayout><LoadingSkeleton /></AppLayout>;
 
