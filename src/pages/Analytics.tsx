@@ -1,19 +1,24 @@
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { zones, districts, coordinators, goals } from "@/data/mockData";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, RadarChart, PolarGrid, PolarAngleAxis, Radar } from "recharts";
-import { useState } from "react";
+import { useZones, useDistricts, useCoordinators, useGoals, LoadingSkeleton } from "@/hooks/useSupabaseData";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
 
 export default function Analytics() {
-  const [compareType, setCompareType] = useState("zones");
+  const { data: zones = [], isLoading: zL } = useZones();
+  const { data: districts = [], isLoading: dL } = useDistricts();
+  const { data: coordinators = [], isLoading: cL } = useCoordinators();
+  const { data: goals = [], isLoading: gL } = useGoals();
+
+  if (zL || dL || cL || gL) return <AppLayout><LoadingSkeleton /></AppLayout>;
+
+  const currentMonth = new Date().toISOString().slice(0, 7);
 
   const zoneComparison = zones.map(z => ({
     name: z.name.length > 10 ? z.name.substring(0, 10) + "…" : z.name,
-    districts: z.districtsCount,
-    coordinators: z.coordinatorsCount,
+    districts: districts.filter(d => d.zone === z.name).length,
+    coordinators: coordinators.filter(c => c.zone === z.name && c.status === "Active").length,
   }));
 
   const coordComparison = coordinators.filter(c => c.status === "Active").slice(0, 8).map(c => ({
@@ -22,7 +27,7 @@ export default function Analytics() {
     attendance: c.attendanceRate || 0,
   }));
 
-  const districtGoalCompletion = goals.filter(g => g.month === "2026-03").map(g => ({
+  const districtGoalCompletion = goals.filter(g => g.month === currentMonth).map(g => ({
     name: g.districtName,
     target: g.targetNumber,
     completed: g.completedNumber || 0,
@@ -45,7 +50,6 @@ export default function Analytics() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Zone Comparison */}
           <Card className="border-none shadow-sm">
             <CardHeader className="pb-2"><CardTitle className="text-base">Zone Comparison</CardTitle></CardHeader>
             <CardContent>
@@ -62,7 +66,6 @@ export default function Analytics() {
             </CardContent>
           </Card>
 
-          {/* Coordinator Performance */}
           <Card className="border-none shadow-sm">
             <CardHeader className="pb-2"><CardTitle className="text-base">Coordinator Performance</CardTitle></CardHeader>
             <CardContent>
@@ -78,9 +81,8 @@ export default function Analytics() {
             </CardContent>
           </Card>
 
-          {/* Goal Completion */}
           <Card className="border-none shadow-sm">
-            <CardHeader className="pb-2"><CardTitle className="text-base">Goal vs Achievement (March 2026)</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-base">Goal vs Achievement</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={districtGoalCompletion}>
@@ -95,7 +97,6 @@ export default function Analytics() {
             </CardContent>
           </Card>
 
-          {/* Category Distribution */}
           <Card className="border-none shadow-sm">
             <CardHeader className="pb-2"><CardTitle className="text-base">Activity Categories</CardTitle></CardHeader>
             <CardContent>

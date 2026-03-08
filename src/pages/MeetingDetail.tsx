@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { meetings, districtMeetingRecords, districts, zones } from "@/data/mockData";
+import { useMeetings, useDistrictMeetingRecords, useDistricts, useZones, LoadingSkeleton } from "@/hooks/useSupabaseData";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Download, Search, FileText, Eye, Plus } from "lucide-react";
 import { useState } from "react";
@@ -15,10 +15,18 @@ import { exportFullMeetingPDF, exportFullMeetingExcel, exportDistrictReportPDF, 
 export default function MeetingDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const meeting = meetings.find(m => m.id === id);
   const [search, setSearch] = useState("");
   const [zoneFilter, setZoneFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  const { data: meetings = [], isLoading: mL } = useMeetings();
+  const { data: dmRecords = [], isLoading: rL } = useDistrictMeetingRecords(id);
+  const { data: districts = [], isLoading: dL } = useDistricts();
+  const { data: zones = [] } = useZones();
+
+  if (mL || rL || dL) return <AppLayout><LoadingSkeleton /></AppLayout>;
+
+  const meeting = meetings.find(m => m.id === id);
 
   if (!meeting) {
     return (
@@ -31,7 +39,7 @@ export default function MeetingDetail() {
     );
   }
 
-  const records = districtMeetingRecords.filter(r => r.meetingId === id);
+  const records = dmRecords;
   const meetingDistricts = meeting.districtIds
     .map(dId => {
       const d = districts.find(dd => dd.id === dId);
@@ -58,28 +66,23 @@ export default function MeetingDetail() {
           <Button variant="ghost" size="icon" onClick={() => navigate("/meetings")}><ArrowLeft className="h-4 w-4" /></Button>
           <div className="flex-1">
             <h1 className="text-2xl font-bold tracking-tight">{meeting.title}</h1>
-            <p className="text-muted-foreground text-sm">
-              {meeting.meetingDate} · {meeting.scope === "All" ? "All Districts" : meeting.scopeValue || meeting.scope}
-            </p>
+            <p className="text-muted-foreground text-sm">{meeting.meetingDate} · {meeting.scope === "All" ? "All Districts" : meeting.scopeValue || meeting.scope}</p>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5 hidden sm:flex">
-                <Download className="h-3.5 w-3.5" /> Export All
-              </Button>
+              <Button variant="outline" size="sm" className="gap-1.5 hidden sm:flex"><Download className="h-3.5 w-3.5" /> Export All</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => exportFullMeetingPDF(id!)}>
+              <DropdownMenuItem onClick={() => exportFullMeetingPDF(meeting, records, districts, zones)}>
                 <FileText className="h-3.5 w-3.5 mr-2" /> Full Report (PDF)
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => exportFullMeetingExcel(id!)}>
+              <DropdownMenuItem onClick={() => exportFullMeetingExcel(meeting, records, districts, zones)}>
                 <FileText className="h-3.5 w-3.5 mr-2" /> Full Report (Excel)
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
 
-        {/* Meeting Info */}
         <Card className="border-none shadow-sm">
           <CardContent className="p-4">
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
@@ -98,7 +101,6 @@ export default function MeetingDetail() {
           </CardContent>
         </Card>
 
-        {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -121,20 +123,14 @@ export default function MeetingDetail() {
           </Select>
         </div>
 
-        {/* District Reports Table */}
         <Card className="border-none shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">District Reports ({filtered.length})</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">District Reports ({filtered.length})</CardTitle></CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>District</TableHead>
-                  <TableHead>Zone</TableHead>
-                  <TableHead>Report Status</TableHead>
-                  <TableHead>Attendance</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>District</TableHead><TableHead>Zone</TableHead><TableHead>Report Status</TableHead>
+                  <TableHead>Attendance</TableHead><TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -143,43 +139,26 @@ export default function MeetingDetail() {
                     <TableCell className="font-medium text-sm">{d.name}</TableCell>
                     <TableCell className="text-muted-foreground text-xs">{d.zone}</TableCell>
                     <TableCell>
-                      <Badge variant={record?.status === "Completed" ? "default" : "outline"} className="text-[10px]">
-                        {record?.status || "Empty"}
-                      </Badge>
+                      <Badge variant={record?.status === "Completed" ? "default" : "outline"} className="text-[10px]">{record?.status || "Empty"}</Badge>
                     </TableCell>
                     <TableCell>
                       {record?.attendance ? (
-                        <Badge variant={record.attendance === "Present" ? "default" : record.attendance === "Late" ? "secondary" : "destructive"} className="text-[10px]">
-                          {record.attendance}
-                        </Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
+                        <Badge variant={record.attendance === "Present" ? "default" : record.attendance === "Late" ? "secondary" : "destructive"} className="text-[10px]">{record.attendance}</Badge>
+                      ) : <span className="text-xs text-muted-foreground">—</span>}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center gap-1 justify-end">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs gap-1"
-                          onClick={() => navigate(`/meetings/${id}/report/${d.id}`)}
-                        >
-                          {record?.status === "Completed" ? (
-                            <><Eye className="h-3 w-3" /> View</>
-                          ) : (
-                            <><Plus className="h-3 w-3" /> Add Report</>
-                          )}
+                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate(`/meetings/${id}/report/${d.id}`)}>
+                          {record?.status === "Completed" ? <><Eye className="h-3 w-3" /> View</> : <><Plus className="h-3 w-3" /> Add Report</>}
                         </Button>
                         {record?.status === "Completed" && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
-                                <Download className="h-3 w-3" /> Export
-                              </Button>
+                              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1"><Download className="h-3 w-3" /> Export</Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); exportDistrictReportPDF(record); }}>PDF</DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); exportDistrictReportExcel(record); }}>Excel</DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); exportDistrictReportPDF(record, districts, meetings); }}>PDF</DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); exportDistrictReportExcel(record, districts); }}>Excel</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         )}

@@ -4,13 +4,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { goals, zones } from "@/data/mockData";
+import { useGoals, useZones, LoadingSkeleton } from "@/hooks/useSupabaseData";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
 export default function Goals() {
   const [monthFilter, setMonthFilter] = useState("all");
   const [zoneFilter, setZoneFilter] = useState("all");
+
+  const { data: goals = [], isLoading: gL } = useGoals();
+  const { data: zones = [], isLoading: zL } = useZones();
+
+  if (gL || zL) return <AppLayout><LoadingSkeleton /></AppLayout>;
 
   const filtered = goals.filter(g => {
     if (monthFilter !== "all" && g.month !== monthFilter) return false;
@@ -53,13 +58,8 @@ export default function Goals() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Activity</TableHead>
-                  <TableHead>District</TableHead>
-                  <TableHead>Zone</TableHead>
-                  <TableHead>Month</TableHead>
-                  <TableHead>Target</TableHead>
-                  <TableHead>Completed</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Activity</TableHead><TableHead>District</TableHead><TableHead>Zone</TableHead>
+                  <TableHead>Month</TableHead><TableHead>Target</TableHead><TableHead>Completed</TableHead><TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -72,12 +72,13 @@ export default function Goals() {
                     <TableCell className="font-mono">{g.targetNumber}</TableCell>
                     <TableCell className="font-mono">{g.completedNumber ?? "—"}</TableCell>
                     <TableCell>
-                      <Badge variant={g.status === "Completed" ? "default" : g.status === "Partially Completed" ? "secondary" : "outline"} className="text-[10px]">
-                        {g.status}
-                      </Badge>
+                      <Badge variant={g.status === "Completed" ? "default" : g.status === "Partially Completed" ? "secondary" : "outline"} className="text-[10px]">{g.status}</Badge>
                     </TableCell>
                   </TableRow>
                 ))}
+                {filtered.length === 0 && (
+                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No goals found</TableCell></TableRow>
+                )}
               </TableBody>
             </Table>
           </CardContent>
