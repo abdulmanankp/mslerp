@@ -18,6 +18,8 @@ import { useState } from "react";
 export default function DistrictProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [goalDialogOpen, setGoalDialogOpen] = useState(false);
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const district = districts.find(d => d.id === id);
 
   if (!district) {
