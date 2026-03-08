@@ -178,19 +178,18 @@ export default function Coordinators() {
                  </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No coordinators found</TableCell></TableRow>
-                ) : filtered.map(c => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium">{c.name}</TableCell>
-                    <TableCell className="text-sm">{c.phone}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{c.zone}</TableCell>
-                    <TableCell className="text-sm">{c.districtName}</TableCell>
-                    <TableCell className="text-sm">{c.joiningDate}</TableCell>
-                    <TableCell className="text-sm">{c.endDate || "—"}</TableCell>
-                    <TableCell className="text-sm">{c.totalActivities || 0}</TableCell>
-                    <TableCell className="text-sm">{c.attendanceRate ? `${c.attendanceRate}%` : "—"}</TableCell>
-                    <TableCell><Badge variant={c.status === "Active" ? "default" : "secondary"} className="text-[10px]">{c.status}</Badge></TableCell>
+                 {filtered.length === 0 ? (
+                   <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No coordinators found</TableCell></TableRow>
+                 ) : filtered.map(c => (
+                   <TableRow key={c.id}>
+                     <TableCell className="font-medium">{c.name}</TableCell>
+                     <TableCell className="text-sm"><Badge variant={c.coordinatorType === "Zonal" ? "default" : "outline"} className="text-[10px]">{c.coordinatorType || "District"}</Badge></TableCell>
+                     <TableCell className="text-muted-foreground text-sm">{c.zone}</TableCell>
+                     <TableCell className="text-sm">{c.districtName || "—"}</TableCell>
+                     <TableCell className="text-sm">{c.phone}</TableCell>
+                     <TableCell className="text-sm">{c.joiningDate}</TableCell>
+                     <TableCell className="text-sm">{c.endDate || "—"}</TableCell>
+                     <TableCell><Badge variant={c.status === "Active" ? "default" : "secondary"} className="text-[10px]">{c.status}</Badge></TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleToggleStatus(c)} title={c.status === "Active" ? "Mark Expired" : "Reactivate"}>
