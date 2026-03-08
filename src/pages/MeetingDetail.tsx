@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { meetings, districtMeetingRecords, districts, zones } from "@/data/mockData";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Download, Search, FileText, Eye, Plus } from "lucide-react";
 import { useState } from "react";
+import { exportFullMeetingPDF, exportFullMeetingExcel, exportDistrictReportPDF, exportDistrictReportExcel } from "@/lib/exportUtils";
 
 export default function MeetingDetail() {
   const { id } = useParams();
