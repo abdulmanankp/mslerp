@@ -483,42 +483,8 @@ export default function DistrictProfile() {
     </AppLayout>
   );
 }
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Activity</TableHead>
-                      <TableHead>Month</TableHead>
-                      <TableHead>Target</TableHead>
-                      <TableHead>Completed</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {districtGoals.map(g => (
-                      <TableRow key={g.id}>
-                        <TableCell className="font-medium text-sm">{g.activityName}</TableCell>
-                        <TableCell className="text-xs">{g.month}</TableCell>
-                        <TableCell className="font-mono">{g.targetNumber}</TableCell>
-                        <TableCell className="font-mono">{g.completedNumber || "—"}</TableCell>
-                        <TableCell>
-                          <Badge variant={g.status === "Completed" ? "default" : g.status === "Partially Completed" ? "secondary" : "outline"} className="text-[10px]">{g.status}</Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {districtGoals.length === 0 && (
-                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8 text-sm">No goals assigned</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
-          {/* Tasks Tab */}
-          <TabsContent value="tasks" className="space-y-4">
-            <Card className="border-none shadow-sm">
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
+
                     <TableRow>
                       <TableHead>Task</TableHead>
                       <TableHead>Priority</TableHead>
