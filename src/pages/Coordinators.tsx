@@ -12,7 +12,7 @@ import { useCoordinators, useCreateCoordinator, useUpdateCoordinator, useDeleteC
 import { Search, Plus, Edit, Trash2, UserCheck, UserX } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import type { Coordinator, ZoneName } from "@/types";
+import type { Coordinator, ZoneName, CoordinatorType } from "@/types";
 
 export default function Coordinators() {
   const [search, setSearch] = useState("");
