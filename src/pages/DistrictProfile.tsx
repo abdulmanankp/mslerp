@@ -82,6 +82,7 @@ export default function DistrictProfile() {
         <Tabs defaultValue="meetings" className="space-y-4">
           <TabsList className="bg-muted/50">
             <TabsTrigger value="meetings" className="gap-1.5"><Calendar className="h-3.5 w-3.5" /> Meetings</TabsTrigger>
+            <TabsTrigger value="monthly-records" className="gap-1.5"><History className="h-3.5 w-3.5" /> Monthly Records</TabsTrigger>
             <TabsTrigger value="overview" className="gap-1.5"><FileText className="h-3.5 w-3.5" /> Overview</TabsTrigger>
             <TabsTrigger value="coordinators" className="gap-1.5"><User className="h-3.5 w-3.5" /> Coordinators</TabsTrigger>
             <TabsTrigger value="goals" className="gap-1.5"><Target className="h-3.5 w-3.5" /> Goals</TabsTrigger>
