@@ -6,11 +6,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { districtMeetingRecords, districts, meetings, activities, goals } from "@/data/mockData";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, FileText, Plus, Download, Save, Pencil, X, ListTodo, MessageSquare, ClipboardList, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { ActivityReport, CustomActivity, NextMonthTask } from "@/types";
+import { exportDistrictReportPDF, exportDistrictReportExcel } from "@/lib/exportUtils";
 
 export default function MeetingReport() {
   const { meetingId, districtId } = useParams();
