@@ -4,11 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { districts, coordinators, zones } from "@/data/mockData";
-import { Search, Plus, Building2 } from "lucide-react";
+import { Search, Plus, Building2, Download, FileText } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { exportDistrictsPDF, exportDistrictsExcel } from "@/lib/exportUtils";
 
 export default function Districts() {
   const navigate = useNavigate();
