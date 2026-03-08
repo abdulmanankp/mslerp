@@ -71,15 +71,21 @@ export default function Coordinators() {
   };
 
   const handleSave = async () => {
-    if (!formName || !formPhone || !formZone || !formDistrictId || !formJoiningDate) {
+    if (!formName || !formPhone || !formZone || !formJoiningDate) {
       toast({ title: "Missing fields", description: "Please fill all required fields.", variant: "destructive" });
       return;
     }
-    const district = districts.find(d => d.id === formDistrictId);
+    if (formCoordinatorType === "District" && !formDistrictId) {
+      toast({ title: "Missing district", description: "Please select a district for District Coordinator.", variant: "destructive" });
+      return;
+    }
+    const district = formDistrictId ? districts.find(d => d.id === formDistrictId) : undefined;
     const payload = {
       name: formName, phone: formPhone, address: formAddress,
-      education: formEducation || undefined, zone: formZone as ZoneName,
-      districtId: formDistrictId, districtName: district?.name || "",
+      education: formEducation || undefined, coordinatorType: formCoordinatorType,
+      zone: formZone as ZoneName,
+      districtId: formCoordinatorType === "District" ? formDistrictId : undefined,
+      districtName: formCoordinatorType === "District" ? (district?.name || "") : undefined,
       joiningDate: formJoiningDate, endDate: formEndDate || undefined, status: formStatus,
       totalActivities: 0, attendanceRate: 0,
     };
