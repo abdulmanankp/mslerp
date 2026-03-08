@@ -6,11 +6,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { districtMeetingRecords, districts, meetings, activities, goals } from "@/data/mockData";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, FileText, Plus, Download, Save, Pencil, X, ListTodo, MessageSquare, ClipboardList, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { ActivityReport, CustomActivity, NextMonthTask } from "@/types";
+import { exportDistrictReportPDF, exportDistrictReportExcel } from "@/lib/exportUtils";
 
 export default function MeetingReport() {
   const { meetingId, districtId } = useParams();
@@ -116,9 +118,21 @@ export default function MeetingReport() {
                 <X className="h-3.5 w-3.5" /> Cancel
               </Button>
             )}
-            <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-              <Download className="h-3.5 w-3.5" /> Export
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+                  <Download className="h-3.5 w-3.5" /> Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => record && exportDistrictReportPDF(record)}>
+                  <FileText className="h-3.5 w-3.5 mr-2" /> Export as PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => record && exportDistrictReportExcel(record)}>
+                  <FileText className="h-3.5 w-3.5 mr-2" /> Export as Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button size="sm" className="gap-1.5 text-xs">
               <Save className="h-3.5 w-3.5" /> Save
             </Button>

@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { meetings, districtMeetingRecords, districts, zones } from "@/data/mockData";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Download, Search, FileText, Eye, Plus } from "lucide-react";
 import { useState } from "react";
+import { exportFullMeetingPDF, exportFullMeetingExcel, exportDistrictReportPDF, exportDistrictReportExcel } from "@/lib/exportUtils";
 
 export default function MeetingDetail() {
   const { id } = useParams();
@@ -60,9 +62,21 @@ export default function MeetingDetail() {
               {meeting.meetingDate} · {meeting.scope === "All" ? "All Districts" : meeting.scopeValue || meeting.scope}
             </p>
           </div>
-          <Button variant="outline" size="sm" className="gap-1.5 hidden sm:flex">
-            <Download className="h-3.5 w-3.5" /> Export All
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5 hidden sm:flex">
+                <Download className="h-3.5 w-3.5" /> Export All
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => exportFullMeetingPDF(id!)}>
+                <FileText className="h-3.5 w-3.5 mr-2" /> Full Report (PDF)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportFullMeetingExcel(id!)}>
+                <FileText className="h-3.5 w-3.5 mr-2" /> Full Report (Excel)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Meeting Info */}
@@ -157,9 +171,17 @@ export default function MeetingDetail() {
                           )}
                         </Button>
                         {record?.status === "Completed" && (
-                          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
-                            <Download className="h-3 w-3" /> Export
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+                                <Download className="h-3 w-3" /> Export
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); exportDistrictReportPDF(record); }}>PDF</DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); exportDistrictReportExcel(record); }}>Excel</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
                       </div>
                     </TableCell>

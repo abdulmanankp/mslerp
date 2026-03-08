@@ -4,11 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { districts, coordinators, zones } from "@/data/mockData";
-import { Search, Plus, Building2 } from "lucide-react";
+import { Search, Plus, Building2, Download, FileText } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { exportDistrictsPDF, exportDistrictsExcel } from "@/lib/exportUtils";
 
 export default function Districts() {
   const navigate = useNavigate();
@@ -37,7 +39,24 @@ export default function Districts() {
               {filtered.length} districts · {assigned} with coordinators
             </p>
           </div>
-          <Button className="gap-2 shadow-sm"><Plus className="h-4 w-4" /> Add District</Button>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Download className="h-4 w-4" /> Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => exportDistrictsPDF(filtered)}>
+                  <FileText className="h-3.5 w-3.5 mr-2" /> Export PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportDistrictsExcel(filtered)}>
+                  <FileText className="h-3.5 w-3.5 mr-2" /> Export Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button className="gap-2 shadow-sm"><Plus className="h-4 w-4" /> Add District</Button>
+          </div>
         </div>
 
         {/* Filters */}
