@@ -4,14 +4,22 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { districts, coordinators, districtMeetingRecords, goals, tasks, meetings } from "@/data/mockData";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { districts, coordinators, districtMeetingRecords, goals, tasks, meetings, activities } from "@/data/mockData";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, User, Calendar, Target, ClipboardList, FileText, Plus, Download, Eye } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { useState } from "react";
 
 export default function DistrictProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [goalDialogOpen, setGoalDialogOpen] = useState(false);
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const district = districts.find(d => d.id === id);
 
   if (!district) {
@@ -31,7 +39,6 @@ export default function DistrictProfile() {
   const districtGoals = goals.filter(g => g.districtId === id);
   const districtTasks = tasks.filter(t => t.districtId === id);
 
-  // Build all meeting records for this district (from meetings that include this district)
   const allMeetingsForDistrict = meetings
     .filter(m => m.districtIds.includes(id!))
     .map(m => {
@@ -52,7 +59,6 @@ export default function DistrictProfile() {
   return (
     <AppLayout>
       <div className="space-y-5">
-        {/* Header */}
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/districts")} className="shrink-0">
             <ArrowLeft className="h-4 w-4" />
@@ -64,38 +70,12 @@ export default function DistrictProfile() {
           <Badge variant={district.status === "Active" ? "default" : "secondary"} className="text-xs">{district.status}</Badge>
         </div>
 
-        {/* Info Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <Card className="border-none shadow-sm">
-            <CardContent className="p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Population</p>
-              <p className="text-lg font-bold font-mono">{district.population?.toLocaleString() || "—"}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-none shadow-sm">
-            <CardContent className="p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Coordinator</p>
-              <p className="text-sm font-bold truncate">{currentCoord?.name || "Unassigned"}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-none shadow-sm">
-            <CardContent className="p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Meetings</p>
-              <p className="text-lg font-bold">{allMeetingsForDistrict.length}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-none shadow-sm">
-            <CardContent className="p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Activities Done</p>
-              <p className="text-lg font-bold">{totalActivities}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-none shadow-sm">
-            <CardContent className="p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Active Goals</p>
-              <p className="text-lg font-bold">{districtGoals.filter(g => g.status === "Pending").length}</p>
-            </CardContent>
-          </Card>
+          <Card className="border-none shadow-sm"><CardContent className="p-3"><p className="text-[10px] text-muted-foreground uppercase tracking-wide">Population</p><p className="text-lg font-bold font-mono">{district.population?.toLocaleString() || "—"}</p></CardContent></Card>
+          <Card className="border-none shadow-sm"><CardContent className="p-3"><p className="text-[10px] text-muted-foreground uppercase tracking-wide">Coordinator</p><p className="text-sm font-bold truncate">{currentCoord?.name || "Unassigned"}</p></CardContent></Card>
+          <Card className="border-none shadow-sm"><CardContent className="p-3"><p className="text-[10px] text-muted-foreground uppercase tracking-wide">Meetings</p><p className="text-lg font-bold">{allMeetingsForDistrict.length}</p></CardContent></Card>
+          <Card className="border-none shadow-sm"><CardContent className="p-3"><p className="text-[10px] text-muted-foreground uppercase tracking-wide">Activities Done</p><p className="text-lg font-bold">{totalActivities}</p></CardContent></Card>
+          <Card className="border-none shadow-sm"><CardContent className="p-3"><p className="text-[10px] text-muted-foreground uppercase tracking-wide">Active Goals</p><p className="text-lg font-bold">{districtGoals.filter(g => g.status === "Pending").length}</p></CardContent></Card>
         </div>
 
         <Tabs defaultValue="meetings" className="space-y-4">
@@ -107,13 +87,11 @@ export default function DistrictProfile() {
             <TabsTrigger value="tasks" className="gap-1.5"><ClipboardList className="h-3.5 w-3.5" /> Tasks</TabsTrigger>
           </TabsList>
 
-          {/* Meetings Tab - Primary */}
+          {/* Meetings Tab */}
           <TabsContent value="meetings" className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">Meeting Timeline</h3>
-              <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-                <Plus className="h-3 w-3" /> Create Meeting
-              </Button>
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs"><Plus className="h-3 w-3" /> Create Meeting</Button>
             </div>
             <Card className="border-none shadow-sm">
               <CardContent className="p-0">
@@ -134,52 +112,25 @@ export default function DistrictProfile() {
                         <TableCell className="font-medium text-sm">{meeting.title}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{meeting.month}</TableCell>
                         <TableCell className="text-xs">{meeting.meetingDate}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={record?.status === "Completed" ? "default" : "outline"}
-                            className="text-[10px]"
-                          >
-                            {record?.status || "Empty"}
-                          </Badge>
-                        </TableCell>
+                        <TableCell><Badge variant={record?.status === "Completed" ? "default" : "outline"} className="text-[10px]">{record?.status || "Empty"}</Badge></TableCell>
                         <TableCell>
                           {record?.attendance ? (
-                            <Badge
-                              variant={record.attendance === "Present" ? "default" : record.attendance === "Late" ? "secondary" : "destructive"}
-                              className="text-[10px]"
-                            >
-                              {record.attendance}
-                            </Badge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
+                            <Badge variant={record.attendance === "Present" ? "default" : record.attendance === "Late" ? "secondary" : "destructive"} className="text-[10px]">{record.attendance}</Badge>
+                          ) : <span className="text-xs text-muted-foreground">—</span>}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center gap-1 justify-end">
                             {record ? (
                               <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 text-xs gap-1"
-                                  onClick={() => navigate(`/meetings/${meeting.id}/report/${district.id}`)}
-                                >
-                                  <Eye className="h-3 w-3" />
-                                  {record.status === "Empty" ? "Add Report" : "View Report"}
+                                <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate(`/meetings/${meeting.id}/report/${district.id}`)}>
+                                  <Eye className="h-3 w-3" /> {record.status === "Empty" ? "Add Report" : "View Report"}
                                 </Button>
                                 {record.status === "Completed" && (
-                                  <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
-                                    <Download className="h-3 w-3" /> Export
-                                  </Button>
+                                  <Button variant="ghost" size="sm" className="h-7 text-xs gap-1"><Download className="h-3 w-3" /> Export</Button>
                                 )}
                               </>
                             ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs gap-1"
-                                onClick={() => navigate(`/meetings/${meeting.id}/report/${district.id}`)}
-                              >
+                              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate(`/meetings/${meeting.id}/report/${district.id}`)}>
                                 <Plus className="h-3 w-3" /> Add Report
                               </Button>
                             )}
@@ -188,11 +139,7 @@ export default function DistrictProfile() {
                       </TableRow>
                     ))}
                     {allMeetingsForDistrict.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground py-10 text-sm">
-                          No meetings assigned to this district yet
-                        </TableCell>
-                      </TableRow>
+                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-10 text-sm">No meetings assigned to this district yet</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -237,7 +184,7 @@ export default function DistrictProfile() {
               <Card className="border-none shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <div className="w-2 h-2 rounded-full bg-primary" />
                     Current Coordinator
                   </CardTitle>
                 </CardHeader>
@@ -266,12 +213,7 @@ export default function DistrictProfile() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Start</TableHead>
-                        <TableHead>End</TableHead>
-                        <TableHead>Activities</TableHead>
-                        <TableHead>Attendance</TableHead>
+                        <TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>Start</TableHead><TableHead>End</TableHead><TableHead>Activities</TableHead><TableHead>Attendance</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -294,16 +236,64 @@ export default function DistrictProfile() {
 
           {/* Goals Tab */}
           <TabsContent value="goals" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Assigned Goals</h3>
+              <Dialog open={goalDialogOpen} onOpenChange={setGoalDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5 text-xs"><Plus className="h-3 w-3" /> Assign Goal</Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Assign Goal to {district.name}</DialogTitle>
+                    <DialogDescription>Set a monthly activity goal for this district.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs">District</Label>
+                        <Input value={district.name} disabled className="bg-muted/50" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Zone</Label>
+                        <Input value={district.zone} disabled className="bg-muted/50" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Activity</Label>
+                      <Select>
+                        <SelectTrigger><SelectValue placeholder="Select activity..." /></SelectTrigger>
+                        <SelectContent>
+                          {activities.filter(a => a.status === "Active").map(a => (
+                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs">Month</Label>
+                        <Input type="month" defaultValue="2026-04" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Target Number</Label>
+                        <Input type="number" placeholder="e.g., 10" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Notes (Optional)</Label>
+                      <Textarea placeholder="Goal notes..." rows={2} />
+                    </div>
+                    <Button className="w-full" onClick={() => setGoalDialogOpen(false)}>Assign Goal</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
             <Card className="border-none shadow-sm">
               <CardContent className="p-0">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Activity</TableHead>
-                      <TableHead>Month</TableHead>
-                      <TableHead>Target</TableHead>
-                      <TableHead>Completed</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Activity</TableHead><TableHead>Month</TableHead><TableHead>Target</TableHead><TableHead>Completed</TableHead><TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -313,9 +303,7 @@ export default function DistrictProfile() {
                         <TableCell className="text-xs">{g.month}</TableCell>
                         <TableCell className="font-mono">{g.targetNumber}</TableCell>
                         <TableCell className="font-mono">{g.completedNumber || "—"}</TableCell>
-                        <TableCell>
-                          <Badge variant={g.status === "Completed" ? "default" : g.status === "Partially Completed" ? "secondary" : "outline"} className="text-[10px]">{g.status}</Badge>
-                        </TableCell>
+                        <TableCell><Badge variant={g.status === "Completed" ? "default" : g.status === "Partially Completed" ? "secondary" : "outline"} className="text-[10px]">{g.status}</Badge></TableCell>
                       </TableRow>
                     ))}
                     {districtGoals.length === 0 && (
@@ -329,15 +317,69 @@ export default function DistrictProfile() {
 
           {/* Tasks Tab */}
           <TabsContent value="tasks" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Assigned Tasks</h3>
+              <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5 text-xs"><Plus className="h-3 w-3" /> Add Task</Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Add Task for {district.name}</DialogTitle>
+                    <DialogDescription>Assign a new task to this district.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs">District</Label>
+                        <Input value={district.name} disabled className="bg-muted/50" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Zone</Label>
+                        <Input value={district.zone} disabled className="bg-muted/50" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Task Title</Label>
+                      <Input placeholder="e.g., Organize Quran Classes" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Department (Optional)</Label>
+                      <Input placeholder="e.g., Education" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs">Start Date</Label>
+                        <Input type="date" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Deadline</Label>
+                        <Input type="date" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Priority</Label>
+                      <Select defaultValue="Medium">
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Low">Low</SelectItem>
+                          <SelectItem value="Medium">Medium</SelectItem>
+                          <SelectItem value="High">High</SelectItem>
+                          <SelectItem value="Critical">Critical</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button className="w-full" onClick={() => setTaskDialogOpen(false)}>Add Task</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
             <Card className="border-none shadow-sm">
               <CardContent className="p-0">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Task</TableHead>
-                      <TableHead>Priority</TableHead>
-                      <TableHead>Deadline</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Task</TableHead><TableHead>Priority</TableHead><TableHead>Deadline</TableHead><TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
