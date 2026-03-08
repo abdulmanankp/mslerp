@@ -69,9 +69,7 @@ export default function AppSidebar() {
         <div className="flex items-center justify-between px-4 h-16 border-b border-sidebar-border shrink-0">
           {!collapsed && (
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                <Shield className="h-4 w-4 text-white" />
-              </div>
+              <img src="/msl-logo.webp" alt="MSL Logo" className="w-9 h-9 rounded-xl object-contain" />
               <div>
                 <h2 className="font-bold text-sm tracking-tight text-sidebar-foreground">MSL ERP</h2>
                 <p className="text-[10px] text-sidebar-foreground/50 font-medium">Management Portal</p>
@@ -79,9 +77,7 @@ export default function AppSidebar() {
             </div>
           )}
           {collapsed && (
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
-              <Shield className="h-4 w-4 text-white" />
-            </div>
+            <img src="/msl-logo.webp" alt="MSL Logo" className="w-9 h-9 rounded-xl object-contain mx-auto" />
           )}
           <Button
             variant="ghost"
