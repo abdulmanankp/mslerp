@@ -171,11 +171,11 @@ export default function Coordinators() {
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>Zone</TableHead><TableHead>District</TableHead>
-                  <TableHead>Joined</TableHead><TableHead>End Date</TableHead><TableHead>Activities</TableHead><TableHead>Attendance</TableHead>
-                  <TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead>
-                </TableRow>
+                 <TableRow>
+                   <TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>Type</TableHead><TableHead>Zone</TableHead><TableHead>District</TableHead>
+                   <TableHead>Joined</TableHead><TableHead>End Date</TableHead>
+                   <TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead>
+                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
