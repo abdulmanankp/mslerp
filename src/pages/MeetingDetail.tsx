@@ -62,9 +62,21 @@ export default function MeetingDetail() {
               {meeting.meetingDate} · {meeting.scope === "All" ? "All Districts" : meeting.scopeValue || meeting.scope}
             </p>
           </div>
-          <Button variant="outline" size="sm" className="gap-1.5 hidden sm:flex">
-            <Download className="h-3.5 w-3.5" /> Export All
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5 hidden sm:flex">
+                <Download className="h-3.5 w-3.5" /> Export All
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => exportFullMeetingPDF(id!)}>
+                <FileText className="h-3.5 w-3.5 mr-2" /> Full Report (PDF)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportFullMeetingExcel(id!)}>
+                <FileText className="h-3.5 w-3.5 mr-2" /> Full Report (Excel)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Meeting Info */}
