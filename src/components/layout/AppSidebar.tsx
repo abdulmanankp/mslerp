@@ -12,6 +12,7 @@ import {
   Settings,
   ChevronLeft,
   Menu,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -32,6 +33,7 @@ const navItems = [
 
 export default function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
 
   return (
@@ -39,18 +41,18 @@ export default function AppSidebar() {
       {/* Mobile overlay */}
       <div
         className={cn(
-          "fixed inset-0 z-40 bg-black/50 lg:hidden transition-opacity",
-          collapsed ? "opacity-0 pointer-events-none" : "opacity-100"
+          "fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden transition-opacity",
+          mobileOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
-        onClick={() => setCollapsed(true)}
+        onClick={() => setMobileOpen(false)}
       />
 
       {/* Mobile toggle */}
       <Button
         variant="ghost"
         size="icon"
-        className="fixed top-3 left-3 z-50 lg:hidden"
-        onClick={() => setCollapsed(!collapsed)}
+        className="fixed top-3 left-3 z-50 lg:hidden bg-card shadow-md border border-border"
+        onClick={() => setMobileOpen(!mobileOpen)}
       >
         <Menu className="h-5 w-5" />
       </Button>
@@ -59,20 +61,26 @@ export default function AppSidebar() {
       <aside
         className={cn(
           "fixed left-0 top-0 z-40 h-screen bg-sidebar text-sidebar-foreground border-r border-sidebar-border transition-all duration-300 flex flex-col",
-          collapsed ? "-translate-x-full lg:translate-x-0 lg:w-[68px]" : "translate-x-0 w-64"
+          mobileOpen ? "translate-x-0 w-64" : "-translate-x-full lg:translate-x-0",
+          collapsed ? "lg:w-[72px]" : "lg:w-64"
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 h-16 border-b border-sidebar-border">
+        <div className="flex items-center justify-between px-4 h-16 border-b border-sidebar-border shrink-0">
           {!collapsed && (
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
-                <span className="text-sidebar-primary-foreground font-bold text-sm">OM</span>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                <Shield className="h-4 w-4 text-white" />
               </div>
               <div>
-                <h2 className="font-semibold text-sm text-sidebar-foreground">Org Manager</h2>
-                <p className="text-[10px] text-sidebar-foreground/60">ERP Portal</p>
+                <h2 className="font-bold text-sm tracking-tight text-sidebar-foreground">MSL ERP</h2>
+                <p className="text-[10px] text-sidebar-foreground/50 font-medium">Management Portal</p>
               </div>
+            </div>
+          )}
+          {collapsed && (
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
+              <Shield className="h-4 w-4 text-white" />
             </div>
           )}
           <Button
@@ -86,7 +94,12 @@ export default function AppSidebar() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto scrollbar-thin">
+        <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto scrollbar-thin">
+          {!collapsed && (
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40 px-3 mb-2">
+              Navigation
+            </p>
+          )}
           {navItems.map((item) => {
             const isActive = location.pathname === item.to || 
               (item.to !== "/" && location.pathname.startsWith(item.to));
@@ -94,16 +107,17 @@ export default function AppSidebar() {
               <NavLink
                 key={item.to}
                 to={item.to}
-                onClick={() => window.innerWidth < 1024 && setCollapsed(true)}
+                onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all group",
                   isActive
                     ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-lg shadow-sidebar-primary/25"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-                  collapsed && "lg:justify-center lg:px-0"
+                    : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                  collapsed && "lg:justify-center lg:px-2"
                 )}
+                title={collapsed ? item.label : undefined}
               >
-                <item.icon className="h-[18px] w-[18px] shrink-0" />
+                <item.icon className={cn("h-[18px] w-[18px] shrink-0", isActive && "drop-shadow-sm")} />
                 {!collapsed && <span>{item.label}</span>}
               </NavLink>
             );
@@ -111,19 +125,19 @@ export default function AppSidebar() {
         </nav>
 
         {/* Footer */}
-        {!collapsed && (
-          <div className="p-4 border-t border-sidebar-border">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center">
-                <span className="text-xs font-medium">PA</span>
-              </div>
-              <div>
-                <p className="text-sm font-medium">President Admin</p>
-                <p className="text-[10px] text-sidebar-foreground/50">Super Admin</p>
-              </div>
+        <div className={cn("border-t border-sidebar-border shrink-0", collapsed ? "p-2" : "p-4")}>
+          <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 flex items-center justify-center ring-2 ring-emerald-500/30">
+              <span className="text-xs font-bold text-emerald-400">PA</span>
             </div>
+            {!collapsed && (
+              <div>
+                <p className="text-sm font-semibold text-sidebar-foreground">President Admin</p>
+                <p className="text-[10px] text-sidebar-foreground/40 font-medium">Super Admin</p>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </aside>
     </>
   );

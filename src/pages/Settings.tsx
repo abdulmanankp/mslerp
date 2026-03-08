@@ -5,33 +5,43 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Shield, Download, Bell, Globe } from "lucide-react";
 
 export default function Settings() {
   return (
     <AppLayout>
-      <div className="space-y-6 max-w-2xl">
+      <div className="space-y-5 max-w-3xl">
         <div>
-          <h1 className="text-2xl font-bold">Settings</h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage system settings</p>
+          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">Manage system settings & configuration</p>
         </div>
 
         <Card className="border-none shadow-sm">
-          <CardHeader><CardTitle className="text-base">Organization</CardTitle></CardHeader>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Globe className="h-4 w-4 text-primary" /> Organization
+            </CardTitle>
+          </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Organization Name</Label>
-              <Input defaultValue="National Organization Pakistan" />
+              <Label className="text-xs">Organization Name</Label>
+              <Input defaultValue="MSL Pakistan" />
             </div>
             <div className="space-y-2">
-              <Label>Admin Email</Label>
-              <Input defaultValue="admin@org.pk" type="email" />
+              <Label className="text-xs">Admin Email</Label>
+              <Input defaultValue="admin@msl.pk" type="email" />
             </div>
-            <Button>Save Changes</Button>
+            <Button size="sm">Save Changes</Button>
           </CardContent>
         </Card>
 
         <Card className="border-none shadow-sm">
-          <CardHeader><CardTitle className="text-base">Notifications</CardTitle></CardHeader>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Bell className="h-4 w-4" /> Notifications
+            </CardTitle>
+          </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -52,13 +62,33 @@ export default function Settings() {
         </Card>
 
         <Card className="border-none shadow-sm">
-          <CardHeader><CardTitle className="text-base">Export</CardTitle></CardHeader>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Shield className="h-4 w-4" /> User Roles
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {["Super Admin", "President", "Zone Coordinator", "District Coordinator", "Department Head", "Viewer"].map(role => (
+                <Badge key={role} variant="secondary" className="text-xs">{role}</Badge>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-3">Role-based access control coming with database integration</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Download className="h-4 w-4" /> Export
+            </CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">Export reports in various formats</p>
+            <p className="text-xs text-muted-foreground">Export reports in various formats</p>
             <div className="flex gap-3">
-              <Button variant="outline">Export PDF</Button>
-              <Button variant="outline">Export Excel</Button>
-              <Button variant="outline">Export CSV</Button>
+              <Button variant="outline" size="sm">Export PDF</Button>
+              <Button variant="outline" size="sm">Export Excel</Button>
+              <Button variant="outline" size="sm">Export CSV</Button>
             </div>
           </CardContent>
         </Card>
