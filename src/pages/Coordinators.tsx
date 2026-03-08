@@ -64,8 +64,9 @@ export default function Coordinators() {
   const openEditDialog = (c: Coordinator) => {
     setEditingCoordinator(c);
     setFormName(c.name); setFormPhone(c.phone); setFormAddress(c.address);
-    setFormEducation(c.education || ""); setFormZone(c.zone); setFormDistrictId(c.districtId);
+    setFormEducation(c.education || ""); setFormZone(c.zone); setFormDistrictId(c.districtId || "");
     setFormJoiningDate(c.joiningDate); setFormEndDate(c.endDate || ""); setFormStatus(c.status);
+    setFormCoordinatorType(c.coordinatorType || "District");
     setDialogOpen(true);
   };
 
