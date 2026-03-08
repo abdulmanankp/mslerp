@@ -5,13 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { tasks, zones } from "@/data/mockData";
+import { useTasks, LoadingSkeleton } from "@/hooks/useSupabaseData";
 import { Search, Plus } from "lucide-react";
 import { useState } from "react";
 
 export default function Tasks() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const { data: tasks = [], isLoading } = useTasks();
+
+  if (isLoading) return <AppLayout><LoadingSkeleton /></AppLayout>;
 
   const filtered = tasks.filter(t => {
     if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false;
@@ -20,11 +23,7 @@ export default function Tasks() {
   });
 
   const priorityColor = (p: string) => {
-    switch (p) {
-      case "Critical": return "destructive" as const;
-      case "High": return "destructive" as const;
-      default: return "secondary" as const;
-    }
+    switch (p) { case "Critical": case "High": return "destructive" as const; default: return "secondary" as const; }
   };
 
   return (
@@ -60,12 +59,8 @@ export default function Tasks() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Task</TableHead>
-                  <TableHead>District</TableHead>
-                  <TableHead>Zone</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Deadline</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Task</TableHead><TableHead>District</TableHead><TableHead>Zone</TableHead>
+                  <TableHead>Priority</TableHead><TableHead>Deadline</TableHead><TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -79,6 +74,9 @@ export default function Tasks() {
                     <TableCell><Badge variant={t.status === "Completed" ? "default" : "outline"} className="text-[10px]">{t.status}</Badge></TableCell>
                   </TableRow>
                 ))}
+                {filtered.length === 0 && (
+                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No tasks found</TableCell></TableRow>
+                )}
               </TableBody>
             </Table>
           </CardContent>

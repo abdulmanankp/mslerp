@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { districts, coordinators, zones } from "@/data/mockData";
+import { useDistricts, useCoordinators, useZones, LoadingSkeleton } from "@/hooks/useSupabaseData";
 import { Search, Plus, Building2, Download, FileText } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState } from "react";
@@ -19,6 +19,12 @@ export default function Districts() {
   const [zoneFilter, setZoneFilter] = useState(initialZone);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  const { data: districts = [], isLoading: dL } = useDistricts();
+  const { data: coordinators = [], isLoading: cL } = useCoordinators();
+  const { data: zones = [], isLoading: zL } = useZones();
+
+  if (dL || cL || zL) return <AppLayout><LoadingSkeleton /></AppLayout>;
 
   const filtered = districts.filter(d => {
     if (zoneFilter !== "all" && d.zone !== zoneFilter) return false;
@@ -35,22 +41,18 @@ export default function Districts() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Districts</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">
-              {filtered.length} districts · {assigned} with coordinators
-            </p>
+            <p className="text-muted-foreground text-sm mt-0.5">{filtered.length} districts · {assigned} with coordinators</p>
           </div>
           <div className="flex items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <Download className="h-4 w-4" /> Export
-                </Button>
+                <Button variant="outline" className="gap-2"><Download className="h-4 w-4" /> Export</Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => exportDistrictsPDF(filtered)}>
+                <DropdownMenuItem onClick={() => exportDistrictsPDF(filtered, coordinators)}>
                   <FileText className="h-3.5 w-3.5 mr-2" /> Export PDF
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => exportDistrictsExcel(filtered)}>
+                <DropdownMenuItem onClick={() => exportDistrictsExcel(filtered, coordinators)}>
                   <FileText className="h-3.5 w-3.5 mr-2" /> Export Excel
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -59,7 +61,6 @@ export default function Districts() {
           </div>
         </div>
 
-        {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -85,7 +86,6 @@ export default function Districts() {
           </Select>
         </div>
 
-        {/* Table */}
         <Card className="border-none shadow-sm">
           <CardContent className="p-0">
             <Table>
@@ -115,16 +115,10 @@ export default function Districts() {
                       <TableCell className="text-muted-foreground text-xs">{d.zone}</TableCell>
                       <TableCell className="text-muted-foreground text-xs">{d.division}</TableCell>
                       <TableCell>
-                        {coord ? (
-                          <span className="text-sm">{coord.name}</span>
-                        ) : (
-                          <span className="text-muted-foreground text-xs italic">Unassigned</span>
-                        )}
+                        {coord ? <span className="text-sm">{coord.name}</span> : <span className="text-muted-foreground text-xs italic">Unassigned</span>}
                       </TableCell>
                       <TableCell className="text-sm text-right font-mono">{d.population?.toLocaleString() || "—"}</TableCell>
-                      <TableCell>
-                        <Badge variant={d.status === "Active" ? "default" : "secondary"} className="text-[10px]">{d.status}</Badge>
-                      </TableCell>
+                      <TableCell><Badge variant={d.status === "Active" ? "default" : "secondary"} className="text-[10px]">{d.status}</Badge></TableCell>
                     </TableRow>
                   );
                 })}

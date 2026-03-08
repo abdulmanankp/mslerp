@@ -3,13 +3,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { zones, districts, coordinators } from "@/data/mockData";
+import { useZones, useDistricts, useCoordinators, LoadingSkeleton } from "@/hooks/useSupabaseData";
 import { MapPin, Building2, Users, ArrowRight, Download, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { exportZoneReportPDF, exportZoneReportExcel } from "@/lib/exportUtils";
 
 export default function Zones() {
   const navigate = useNavigate();
+  const { data: zones = [], isLoading: zL } = useZones();
+  const { data: districts = [], isLoading: dL } = useDistricts();
+  const { data: coordinators = [], isLoading: cL } = useCoordinators();
+
+  if (zL || dL || cL) return <AppLayout><LoadingSkeleton /></AppLayout>;
 
   return (
     <AppLayout>
@@ -25,11 +30,7 @@ export default function Zones() {
             const zoneCoords = coordinators.filter(c => c.zone === zone.name && c.status === "Active");
             const withCoord = zoneDistricts.filter(d => d.currentCoordinatorId).length;
             return (
-              <Card
-                key={zone.id}
-                className="border-none shadow-sm hover:shadow-md transition-all cursor-pointer group"
-                onClick={() => navigate(`/districts?zone=${encodeURIComponent(zone.name)}`)}
-              >
+              <Card key={zone.id} className="border-none shadow-sm hover:shadow-md transition-all cursor-pointer group" onClick={() => navigate(`/districts?zone=${encodeURIComponent(zone.name)}`)}>
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between mb-4">
                     <div className="p-2.5 rounded-xl bg-primary/10 group-hover:bg-primary/15 transition-colors">
@@ -43,10 +44,10 @@ export default function Zones() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={e => { e.stopPropagation(); exportZoneReportPDF(zone.name); }}>
+                          <DropdownMenuItem onClick={e => { e.stopPropagation(); exportZoneReportPDF(zone.name, districts, coordinators, []); }}>
                             <FileText className="h-3.5 w-3.5 mr-2" /> Export PDF
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={e => { e.stopPropagation(); exportZoneReportExcel(zone.name); }}>
+                          <DropdownMenuItem onClick={e => { e.stopPropagation(); exportZoneReportExcel(zone.name, districts, coordinators, []); }}>
                             <FileText className="h-3.5 w-3.5 mr-2" /> Export Excel
                           </DropdownMenuItem>
                         </DropdownMenuContent>

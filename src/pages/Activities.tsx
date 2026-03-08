@@ -3,10 +3,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { activities } from "@/data/mockData";
+import { useActivities, LoadingSkeleton } from "@/hooks/useSupabaseData";
 import { Plus } from "lucide-react";
 
 export default function Activities() {
+  const { data: activities = [], isLoading } = useActivities();
+
+  if (isLoading) return <AppLayout><LoadingSkeleton /></AppLayout>;
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -38,6 +42,9 @@ export default function Activities() {
                     <TableCell><Badge variant={a.status === "Active" ? "default" : "secondary"} className="text-[10px]">{a.status}</Badge></TableCell>
                   </TableRow>
                 ))}
+                {activities.length === 0 && (
+                  <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No activities defined yet</TableCell></TableRow>
+                )}
               </TableBody>
             </Table>
           </CardContent>

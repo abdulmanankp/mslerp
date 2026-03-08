@@ -9,12 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { districts, coordinators, districtMeetingRecords, goals, tasks, meetings, activities } from "@/data/mockData";
+import { useDistricts, useCoordinators, useDistrictMeetingRecords, useGoals, useTasks, useMeetings, useActivities, LoadingSkeleton } from "@/hooks/useSupabaseData";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, User, Calendar, Target, ClipboardList, FileText, Plus, Download, Eye } from "lucide-react";
+import { ArrowLeft, User, Calendar, Target, ClipboardList, FileText, Plus, Download, Eye, History } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { useState, useMemo } from "react";
-import { History } from "lucide-react";
+import { useState } from "react";
 
 export default function DistrictProfile() {
   const { id } = useParams();
@@ -22,49 +21,51 @@ export default function DistrictProfile() {
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState("all");
-  const district = districts.find(d => d.id === id);
 
+  const { data: districts = [], isLoading: dL } = useDistricts();
+  const { data: coordinators = [], isLoading: cL } = useCoordinators();
+  const { data: dmRecords = [], isLoading: rL } = useDistrictMeetingRecords();
+  const { data: goals = [], isLoading: gL } = useGoals();
+  const { data: tasks = [], isLoading: tL } = useTasks();
+  const { data: meetings = [], isLoading: mL } = useMeetings();
+  const { data: activities = [] } = useActivities();
+
+  if (dL || cL || rL || gL || tL || mL) return <AppLayout><LoadingSkeleton /></AppLayout>;
+
+  const district = districts.find(d => d.id === id);
   if (!district) {
-    return (
-      <AppLayout>
-        <div className="text-center py-20">
-          <p className="text-muted-foreground">District not found</p>
-          <Button variant="ghost" onClick={() => navigate("/districts")}>Go Back</Button>
-        </div>
-      </AppLayout>
-    );
+    return <AppLayout><div className="text-center py-20"><p className="text-muted-foreground">District not found</p><Button variant="ghost" onClick={() => navigate("/districts")}>Go Back</Button></div></AppLayout>;
   }
 
   const currentCoord = coordinators.find(c => c.id === district.currentCoordinatorId);
   const previousCoords = coordinators.filter(c => c.districtId === id && c.status === "Expired");
-  const dmRecords = districtMeetingRecords.filter(r => r.districtId === id);
+  const districtRecords = dmRecords.filter(r => r.districtId === id);
   const districtGoals = goals.filter(g => g.districtId === id);
   const districtTasks = tasks.filter(t => t.districtId === id);
 
   const allMeetingsForDistrict = meetings
     .filter(m => m.districtIds.includes(id!))
-    .map(m => {
-      const record = dmRecords.find(r => r.meetingId === m.id);
-      return { meeting: m, record };
-    })
+    .map(m => ({ meeting: m, record: districtRecords.find(r => r.meetingId === m.id) }))
     .sort((a, b) => b.meeting.meetingDate.localeCompare(a.meeting.meetingDate));
 
-  const activityChartData = dmRecords.flatMap(r => r.activityReports).reduce((acc, ar) => {
+  const activityChartData = districtRecords.flatMap(r => r.activityReports).reduce((acc, ar) => {
     const existing = acc.find(a => a.name === ar.activityName);
     if (existing) existing.count += ar.completedQuantity;
     else acc.push({ name: ar.activityName.length > 12 ? ar.activityName.substring(0, 12) + "…" : ar.activityName, count: ar.completedQuantity });
     return acc;
   }, [] as { name: string; count: number }[]);
 
-  const totalActivities = dmRecords.reduce((sum, r) => sum + r.activityReports.reduce((s, ar) => s + ar.completedQuantity, 0), 0);
+  const totalActivities = districtRecords.reduce((sum, r) => sum + r.activityReports.reduce((s, ar) => s + ar.completedQuantity, 0), 0);
+
+  const months = [...new Set(districtRecords.map(r => r.month))].sort().reverse();
+  const filteredRecords = selectedMonth === "all" ? districtRecords : districtRecords.filter(r => r.month === selectedMonth);
+  const filteredGoals = selectedMonth === "all" ? districtGoals : districtGoals.filter(g => g.month === selectedMonth);
 
   return (
     <AppLayout>
       <div className="space-y-5">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/districts")} className="shrink-0">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/districts")} className="shrink-0"><ArrowLeft className="h-4 w-4" /></Button>
           <div className="flex-1">
             <h1 className="text-2xl font-bold tracking-tight">{district.name}</h1>
             <p className="text-muted-foreground text-sm">{district.zone} · {district.division} Division</p>
@@ -90,433 +91,194 @@ export default function DistrictProfile() {
             <TabsTrigger value="tasks" className="gap-1.5"><ClipboardList className="h-3.5 w-3.5" /> Tasks</TabsTrigger>
           </TabsList>
 
-          {/* Meetings Tab */}
           <TabsContent value="meetings" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">Meeting Timeline</h3>
-              <Button variant="outline" size="sm" className="gap-1.5 text-xs"><Plus className="h-3 w-3" /> Create Meeting</Button>
-            </div>
-            <Card className="border-none shadow-sm">
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Meeting</TableHead>
-                      <TableHead>Month</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Report Status</TableHead>
-                      <TableHead>Attendance</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+            <Card className="border-none shadow-sm"><CardContent className="p-0">
+              <Table>
+                <TableHeader><TableRow><TableHead>Meeting</TableHead><TableHead>Month</TableHead><TableHead>Date</TableHead><TableHead>Report Status</TableHead><TableHead>Attendance</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {allMeetingsForDistrict.map(({ meeting, record }) => (
+                    <TableRow key={meeting.id}>
+                      <TableCell className="font-medium text-sm">{meeting.title}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{meeting.month}</TableCell>
+                      <TableCell className="text-xs">{meeting.meetingDate}</TableCell>
+                      <TableCell><Badge variant={record?.status === "Completed" ? "default" : "outline"} className="text-[10px]">{record?.status || "Empty"}</Badge></TableCell>
+                      <TableCell>{record?.attendance ? <Badge variant={record.attendance === "Present" ? "default" : record.attendance === "Late" ? "secondary" : "destructive"} className="text-[10px]">{record.attendance}</Badge> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate(`/meetings/${meeting.id}/report/${district.id}`)}>
+                          {record?.status === "Completed" ? <><Eye className="h-3 w-3" /> View</> : <><Plus className="h-3 w-3" /> Add Report</>}
+                        </Button>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {allMeetingsForDistrict.map(({ meeting, record }) => (
-                      <TableRow key={meeting.id} className="group">
-                        <TableCell className="font-medium text-sm">{meeting.title}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{meeting.month}</TableCell>
-                        <TableCell className="text-xs">{meeting.meetingDate}</TableCell>
-                        <TableCell><Badge variant={record?.status === "Completed" ? "default" : "outline"} className="text-[10px]">{record?.status || "Empty"}</Badge></TableCell>
+                  ))}
+                  {allMeetingsForDistrict.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-10 text-sm">No meetings assigned</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </CardContent></Card>
+          </TabsContent>
+
+          <TabsContent value="monthly-records" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Previous Monthly Records</h3>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filter by month" /></SelectTrigger>
+                <SelectContent><SelectItem value="all">All Months</SelectItem>{months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <Card className="border-none shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm">Activity Reports by Month</CardTitle></CardHeader><CardContent className="p-0">
+              <Table>
+                <TableHeader><TableRow><TableHead>Month</TableHead><TableHead>Meeting</TableHead><TableHead>Activities Done</TableHead><TableHead>Attendance</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {filteredRecords.map(record => (
+                    <TableRow key={record.id}>
+                      <TableCell className="font-medium text-sm">{record.month}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{record.meetingTitle}</TableCell>
+                      <TableCell className="font-mono text-sm">{record.activityReports.reduce((s, ar) => s + ar.completedQuantity, 0)}</TableCell>
+                      <TableCell>{record.attendance ? <Badge variant={record.attendance === "Present" ? "default" : "secondary"} className="text-[10px]">{record.attendance}</Badge> : "—"}</TableCell>
+                      <TableCell><Badge variant={record.status === "Completed" ? "default" : "outline"} className="text-[10px]">{record.status}</Badge></TableCell>
+                      <TableCell className="text-right"><Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate(`/meetings/${record.meetingId}/report/${district.id}`)}><Eye className="h-3 w-3" /> View</Button></TableCell>
+                    </TableRow>
+                  ))}
+                  {filteredRecords.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8 text-sm">No records</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </CardContent></Card>
+
+            <Card className="border-none shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm">Goals Progress</CardTitle></CardHeader><CardContent className="p-0">
+              <Table>
+                <TableHeader><TableRow><TableHead>Month</TableHead><TableHead>Activity</TableHead><TableHead>Target</TableHead><TableHead>Completed</TableHead><TableHead>Progress</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {filteredGoals.map(g => {
+                    const progress = g.targetNumber > 0 ? Math.round(((g.completedNumber || 0) / g.targetNumber) * 100) : 0;
+                    return (
+                      <TableRow key={g.id}>
+                        <TableCell className="font-medium text-sm">{g.month}</TableCell>
+                        <TableCell className="text-sm">{g.activityName}</TableCell>
+                        <TableCell className="font-mono">{g.targetNumber}</TableCell>
+                        <TableCell className="font-mono">{g.completedNumber || 0}</TableCell>
                         <TableCell>
-                          {record?.attendance ? (
-                            <Badge variant={record.attendance === "Present" ? "default" : record.attendance === "Late" ? "secondary" : "destructive"} className="text-[10px]">{record.attendance}</Badge>
-                          ) : <span className="text-xs text-muted-foreground">—</span>}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center gap-1 justify-end">
-                            {record ? (
-                              <>
-                                <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate(`/meetings/${meeting.id}/report/${district.id}`)}>
-                                  <Eye className="h-3 w-3" /> {record.status === "Empty" ? "Add Report" : "View Report"}
-                                </Button>
-                                {record.status === "Completed" && (
-                                  <Button variant="ghost" size="sm" className="h-7 text-xs gap-1"><Download className="h-3 w-3" /> Export</Button>
-                                )}
-                              </>
-                            ) : (
-                              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate(`/meetings/${meeting.id}/report/${district.id}`)}>
-                                <Plus className="h-3 w-3" /> Add Report
-                              </Button>
-                            )}
+                          <div className="flex items-center gap-2">
+                            <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(progress, 100)}%` }} /></div>
+                            <span className="text-[10px] font-mono text-muted-foreground">{progress}%</span>
                           </div>
                         </TableCell>
+                        <TableCell><Badge variant={g.status === "Completed" ? "default" : g.status === "Partially Completed" ? "secondary" : "outline"} className="text-[10px]">{g.status}</Badge></TableCell>
                       </TableRow>
-                    ))}
-                    {allMeetingsForDistrict.length === 0 && (
-                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-10 text-sm">No meetings assigned to this district yet</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                    );
+                  })}
+                  {filteredGoals.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8 text-sm">No goals</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </CardContent></Card>
           </TabsContent>
 
-          {/* Monthly Records Tab */}
-          <TabsContent value="monthly-records" className="space-y-4">
-            {(() => {
-              const months = [...new Set(dmRecords.map(r => r.month))].sort().reverse();
-              const monthGoals = districtGoals;
-              const filteredRecords = selectedMonth === "all" ? dmRecords : dmRecords.filter(r => r.month === selectedMonth);
-              const filteredGoals = selectedMonth === "all" ? monthGoals : monthGoals.filter(g => g.month === selectedMonth);
-
-              return (
-                <>
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold">Previous Monthly Records</h3>
-                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                      <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filter by month" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Months</SelectItem>
-                        {months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Monthly Activity Summary */}
-                  <Card className="border-none shadow-sm">
-                    <CardHeader className="pb-2"><CardTitle className="text-sm">Activity Reports by Month</CardTitle></CardHeader>
-                    <CardContent className="p-0">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Month</TableHead>
-                            <TableHead>Meeting</TableHead>
-                            <TableHead>Activities Done</TableHead>
-                            <TableHead>Custom Activities</TableHead>
-                            <TableHead>Attendance</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredRecords.map(record => {
-                            const totalAct = record.activityReports.reduce((s, ar) => s + ar.completedQuantity, 0);
-                            return (
-                              <TableRow key={record.id}>
-                                <TableCell className="font-medium text-sm">{record.month}</TableCell>
-                                <TableCell className="text-xs text-muted-foreground">{record.meetingTitle}</TableCell>
-                                <TableCell className="font-mono text-sm">{totalAct}</TableCell>
-                                <TableCell className="font-mono text-sm">{record.customActivities.length}</TableCell>
-                                <TableCell>
-                                  {record.attendance ? (
-                                    <Badge variant={record.attendance === "Present" ? "default" : record.attendance === "Late" ? "secondary" : "destructive"} className="text-[10px]">{record.attendance}</Badge>
-                                  ) : <span className="text-xs text-muted-foreground">—</span>}
-                                </TableCell>
-                                <TableCell><Badge variant={record.status === "Completed" ? "default" : "outline"} className="text-[10px]">{record.status}</Badge></TableCell>
-                                <TableCell className="text-right">
-                                  <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate(`/meetings/${record.meetingId}/report/${district.id}`)}>
-                                    <Eye className="h-3 w-3" /> View
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                          {filteredRecords.length === 0 && (
-                            <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8 text-sm">No records for this period</TableCell></TableRow>
-                          )}
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-
-                  {/* Monthly Goals Progress */}
-                  <Card className="border-none shadow-sm">
-                    <CardHeader className="pb-2"><CardTitle className="text-sm">Goals Progress by Month</CardTitle></CardHeader>
-                    <CardContent className="p-0">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Month</TableHead>
-                            <TableHead>Activity</TableHead>
-                            <TableHead>Target</TableHead>
-                            <TableHead>Completed</TableHead>
-                            <TableHead>Progress</TableHead>
-                            <TableHead>Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredGoals.map(g => {
-                            const progress = g.targetNumber > 0 ? Math.round(((g.completedNumber || 0) / g.targetNumber) * 100) : 0;
-                            return (
-                              <TableRow key={g.id}>
-                                <TableCell className="font-medium text-sm">{g.month}</TableCell>
-                                <TableCell className="text-sm">{g.activityName}</TableCell>
-                                <TableCell className="font-mono">{g.targetNumber}</TableCell>
-                                <TableCell className="font-mono">{g.completedNumber || 0}</TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
-                                      <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(progress, 100)}%` }} />
-                                    </div>
-                                    <span className="text-[10px] font-mono text-muted-foreground">{progress}%</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell><Badge variant={g.status === "Completed" ? "default" : g.status === "Partially Completed" ? "secondary" : "outline"} className="text-[10px]">{g.status}</Badge></TableCell>
-                              </TableRow>
-                            );
-                          })}
-                          {filteredGoals.length === 0 && (
-                            <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8 text-sm">No goals for this period</TableCell></TableRow>
-                          )}
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-
-                  {/* Next Month Tasks from Reports */}
-                  {filteredRecords.some(r => r.nextMonthTasks.length > 0) && (
-                    <Card className="border-none shadow-sm">
-                      <CardHeader className="pb-2"><CardTitle className="text-sm">Planned Tasks from Reports</CardTitle></CardHeader>
-                      <CardContent className="p-0">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Month</TableHead>
-                              <TableHead>Task</TableHead>
-                              <TableHead>Type</TableHead>
-                              <TableHead>Target</TableHead>
-                              <TableHead>Deadline</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredRecords.flatMap(r => r.nextMonthTasks.map(t => (
-                              <TableRow key={t.id}>
-                                <TableCell className="text-sm font-medium">{r.month}</TableCell>
-                                <TableCell className="text-sm">{t.taskName}</TableCell>
-                                <TableCell className="text-xs text-muted-foreground">{t.activityType}</TableCell>
-                                <TableCell className="font-mono">{t.targetQuantity}</TableCell>
-                                <TableCell className="text-xs">{t.deadline || "—"}</TableCell>
-                              </TableRow>
-                            )))}
-                          </TableBody>
-                        </Table>
-                      </CardContent>
-                    </Card>
-                  )}
-                </>
-              );
-            })()}
-          </TabsContent>
-
-          {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-4">
             {activityChartData.length > 0 && (
-              <Card className="border-none shadow-sm">
-                <CardHeader className="pb-2"><CardTitle className="text-sm">Activities Summary</CardTitle></CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={activityChartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                      <YAxis tick={{ fontSize: 11 }} />
-                      <Tooltip />
-                      <Bar dataKey="count" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+              <Card className="border-none shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm">Activities Summary</CardTitle></CardHeader><CardContent>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={activityChartData}><CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" /><XAxis dataKey="name" tick={{ fontSize: 10 }} /><YAxis tick={{ fontSize: 11 }} /><Tooltip /><Bar dataKey="count" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} /></BarChart>
+                </ResponsiveContainer>
+              </CardContent></Card>
             )}
-            <Card className="border-none shadow-sm">
-              <CardHeader className="pb-2"><CardTitle className="text-sm">District Information</CardTitle></CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div><span className="text-muted-foreground text-xs">Zone:</span> <span className="font-medium ml-1">{district.zone}</span></div>
-                  <div><span className="text-muted-foreground text-xs">Division:</span> <span className="font-medium ml-1">{district.division}</span></div>
-                  <div><span className="text-muted-foreground text-xs">Created:</span> <span className="font-medium ml-1">{district.createdDate}</span></div>
-                  <div><span className="text-muted-foreground text-xs">Status:</span> <span className="font-medium ml-1">{district.status}</span></div>
-                </div>
-              </CardContent>
-            </Card>
+            <Card className="border-none shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm">District Information</CardTitle></CardHeader><CardContent>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div><span className="text-muted-foreground text-xs">Zone:</span> <span className="font-medium ml-1">{district.zone}</span></div>
+                <div><span className="text-muted-foreground text-xs">Division:</span> <span className="font-medium ml-1">{district.division}</span></div>
+                <div><span className="text-muted-foreground text-xs">Created:</span> <span className="font-medium ml-1">{district.createdDate}</span></div>
+                <div><span className="text-muted-foreground text-xs">Status:</span> <span className="font-medium ml-1">{district.status}</span></div>
+              </div>
+            </CardContent></Card>
           </TabsContent>
 
-          {/* Coordinators Tab */}
           <TabsContent value="coordinators" className="space-y-4">
-            {currentCoord && (
-              <Card className="border-none shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-primary" />
-                    Current Coordinator
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div><span className="text-muted-foreground text-xs">Name:</span><p className="font-medium">{currentCoord.name}</p></div>
-                    <div><span className="text-muted-foreground text-xs">Phone:</span><p className="font-medium">{currentCoord.phone}</p></div>
-                    <div><span className="text-muted-foreground text-xs">Joined:</span><p className="font-medium">{currentCoord.joiningDate}</p></div>
-                    <div><span className="text-muted-foreground text-xs">Activities:</span><p className="font-medium">{currentCoord.totalActivities}</p></div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-            {!currentCoord && (
-              <Card className="border-none shadow-sm">
-                <CardContent className="p-6 text-center">
-                  <p className="text-muted-foreground text-sm">No coordinator assigned</p>
-                  <Button variant="outline" size="sm" className="mt-3 gap-1"><Plus className="h-3 w-3" /> Assign Coordinator</Button>
-                </CardContent>
-              </Card>
+            {currentCoord ? (
+              <Card className="border-none shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-primary" />Current Coordinator</CardTitle></CardHeader><CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div><span className="text-muted-foreground text-xs">Name:</span><p className="font-medium">{currentCoord.name}</p></div>
+                  <div><span className="text-muted-foreground text-xs">Phone:</span><p className="font-medium">{currentCoord.phone}</p></div>
+                  <div><span className="text-muted-foreground text-xs">Joined:</span><p className="font-medium">{currentCoord.joiningDate}</p></div>
+                  <div><span className="text-muted-foreground text-xs">Activities:</span><p className="font-medium">{currentCoord.totalActivities}</p></div>
+                </div>
+              </CardContent></Card>
+            ) : (
+              <Card className="border-none shadow-sm"><CardContent className="p-6 text-center"><p className="text-muted-foreground text-sm">No coordinator assigned</p><Button variant="outline" size="sm" className="mt-3 gap-1"><Plus className="h-3 w-3" /> Assign Coordinator</Button></CardContent></Card>
             )}
             {previousCoords.length > 0 && (
-              <Card className="border-none shadow-sm">
-                <CardHeader className="pb-2"><CardTitle className="text-sm">Previous Coordinators</CardTitle></CardHeader>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>Start</TableHead><TableHead>End</TableHead><TableHead>Activities</TableHead><TableHead>Attendance</TableHead>
+              <Card className="border-none shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm">Previous Coordinators</CardTitle></CardHeader><CardContent className="p-0">
+                <Table>
+                  <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>Start</TableHead><TableHead>End</TableHead><TableHead>Activities</TableHead><TableHead>Attendance</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {previousCoords.map(c => (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-medium text-sm">{c.name}</TableCell><TableCell className="text-xs">{c.phone}</TableCell><TableCell className="text-xs">{c.joiningDate}</TableCell>
+                        <TableCell className="text-xs">{c.endDate}</TableCell><TableCell className="text-sm">{c.totalActivities}</TableCell><TableCell className="text-sm">{c.attendanceRate}%</TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {previousCoords.map(c => (
-                        <TableRow key={c.id}>
-                          <TableCell className="font-medium text-sm">{c.name}</TableCell>
-                          <TableCell className="text-xs">{c.phone}</TableCell>
-                          <TableCell className="text-xs">{c.joiningDate}</TableCell>
-                          <TableCell className="text-xs">{c.endDate}</TableCell>
-                          <TableCell className="text-sm">{c.totalActivities}</TableCell>
-                          <TableCell className="text-sm">{c.attendanceRate}%</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent></Card>
             )}
           </TabsContent>
 
-          {/* Goals Tab */}
           <TabsContent value="goals" className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">Assigned Goals</h3>
               <Dialog open={goalDialogOpen} onOpenChange={setGoalDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-1.5 text-xs"><Plus className="h-3 w-3" /> Assign Goal</Button>
-                </DialogTrigger>
+                <DialogTrigger asChild><Button variant="outline" size="sm" className="gap-1.5 text-xs"><Plus className="h-3 w-3" /> Assign Goal</Button></DialogTrigger>
                 <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Assign Goal to {district.name}</DialogTitle>
-                    <DialogDescription>Set a monthly activity goal for this district.</DialogDescription>
-                  </DialogHeader>
+                  <DialogHeader><DialogTitle>Assign Goal to {district.name}</DialogTitle><DialogDescription>Set a monthly activity goal.</DialogDescription></DialogHeader>
                   <div className="space-y-4 pt-2">
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label className="text-xs">District</Label>
-                        <Input value={district.name} disabled className="bg-muted/50" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Zone</Label>
-                        <Input value={district.zone} disabled className="bg-muted/50" />
-                      </div>
+                      <div className="space-y-2"><Label className="text-xs">District</Label><Input value={district.name} disabled className="bg-muted/50" /></div>
+                      <div className="space-y-2"><Label className="text-xs">Zone</Label><Input value={district.zone} disabled className="bg-muted/50" /></div>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs">Activity</Label>
-                      <Select>
-                        <SelectTrigger><SelectValue placeholder="Select activity..." /></SelectTrigger>
-                        <SelectContent>
-                          {activities.filter(a => a.status === "Active").map(a => (
-                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                          ))}
-                        </SelectContent>
+                    <div className="space-y-2"><Label className="text-xs">Activity</Label>
+                      <Select><SelectTrigger><SelectValue placeholder="Select activity..." /></SelectTrigger>
+                        <SelectContent>{activities.filter(a => a.status === "Active").map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label className="text-xs">Month</Label>
-                        <Input type="month" defaultValue="2026-04" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Target Number</Label>
-                        <Input type="number" placeholder="e.g., 10" />
-                      </div>
+                      <div className="space-y-2"><Label className="text-xs">Month</Label><Input type="month" /></div>
+                      <div className="space-y-2"><Label className="text-xs">Target Number</Label><Input type="number" placeholder="e.g., 10" /></div>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs">Notes (Optional)</Label>
-                      <Textarea placeholder="Goal notes..." rows={2} />
-                    </div>
+                    <div className="space-y-2"><Label className="text-xs">Notes (Optional)</Label><Textarea placeholder="Goal notes..." rows={2} /></div>
                     <Button className="w-full" onClick={() => setGoalDialogOpen(false)}>Assign Goal</Button>
                   </div>
                 </DialogContent>
               </Dialog>
             </div>
-            <Card className="border-none shadow-sm">
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Activity</TableHead><TableHead>Month</TableHead><TableHead>Target</TableHead><TableHead>Completed</TableHead><TableHead>Status</TableHead>
+            <Card className="border-none shadow-sm"><CardContent className="p-0">
+              <Table>
+                <TableHeader><TableRow><TableHead>Activity</TableHead><TableHead>Month</TableHead><TableHead>Target</TableHead><TableHead>Completed</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {districtGoals.map(g => (
+                    <TableRow key={g.id}>
+                      <TableCell className="font-medium text-sm">{g.activityName}</TableCell><TableCell className="text-xs">{g.month}</TableCell>
+                      <TableCell className="font-mono">{g.targetNumber}</TableCell><TableCell className="font-mono">{g.completedNumber || "—"}</TableCell>
+                      <TableCell><Badge variant={g.status === "Completed" ? "default" : g.status === "Partially Completed" ? "secondary" : "outline"} className="text-[10px]">{g.status}</Badge></TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {districtGoals.map(g => (
-                      <TableRow key={g.id}>
-                        <TableCell className="font-medium text-sm">{g.activityName}</TableCell>
-                        <TableCell className="text-xs">{g.month}</TableCell>
-                        <TableCell className="font-mono">{g.targetNumber}</TableCell>
-                        <TableCell className="font-mono">{g.completedNumber || "—"}</TableCell>
-                        <TableCell><Badge variant={g.status === "Completed" ? "default" : g.status === "Partially Completed" ? "secondary" : "outline"} className="text-[10px]">{g.status}</Badge></TableCell>
-                      </TableRow>
-                    ))}
-                    {districtGoals.length === 0 && (
-                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8 text-sm">No goals assigned</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                  ))}
+                  {districtGoals.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8 text-sm">No goals assigned</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </CardContent></Card>
           </TabsContent>
 
-          {/* Tasks Tab */}
           <TabsContent value="tasks" className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">Assigned Tasks</h3>
               <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-1.5 text-xs"><Plus className="h-3 w-3" /> Add Task</Button>
-                </DialogTrigger>
+                <DialogTrigger asChild><Button variant="outline" size="sm" className="gap-1.5 text-xs"><Plus className="h-3 w-3" /> Add Task</Button></DialogTrigger>
                 <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Add Task for {district.name}</DialogTitle>
-                    <DialogDescription>Assign a new task to this district.</DialogDescription>
-                  </DialogHeader>
+                  <DialogHeader><DialogTitle>Add Task for {district.name}</DialogTitle><DialogDescription>Assign a new task to this district.</DialogDescription></DialogHeader>
                   <div className="space-y-4 pt-2">
+                    <div className="space-y-2"><Label className="text-xs">Task Title</Label><Input placeholder="e.g., Organize Quran Classes" /></div>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label className="text-xs">District</Label>
-                        <Input value={district.name} disabled className="bg-muted/50" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Zone</Label>
-                        <Input value={district.zone} disabled className="bg-muted/50" />
-                      </div>
+                      <div className="space-y-2"><Label className="text-xs">Start Date</Label><Input type="date" /></div>
+                      <div className="space-y-2"><Label className="text-xs">Deadline</Label><Input type="date" /></div>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs">Task Title</Label>
-                      <Input placeholder="e.g., Organize Quran Classes" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs">Department (Optional)</Label>
-                      <Input placeholder="e.g., Education" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label className="text-xs">Start Date</Label>
-                        <Input type="date" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Deadline</Label>
-                        <Input type="date" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs">Priority</Label>
-                      <Select defaultValue="Medium">
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Low">Low</SelectItem>
-                          <SelectItem value="Medium">Medium</SelectItem>
-                          <SelectItem value="High">High</SelectItem>
-                          <SelectItem value="Critical">Critical</SelectItem>
-                        </SelectContent>
+                    <div className="space-y-2"><Label className="text-xs">Priority</Label>
+                      <Select defaultValue="Medium"><SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="Low">Low</SelectItem><SelectItem value="Medium">Medium</SelectItem><SelectItem value="High">High</SelectItem><SelectItem value="Critical">Critical</SelectItem></SelectContent>
                       </Select>
                     </div>
                     <Button className="w-full" onClick={() => setTaskDialogOpen(false)}>Add Task</Button>
@@ -524,30 +286,22 @@ export default function DistrictProfile() {
                 </DialogContent>
               </Dialog>
             </div>
-            <Card className="border-none shadow-sm">
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Task</TableHead><TableHead>Priority</TableHead><TableHead>Deadline</TableHead><TableHead>Status</TableHead>
+            <Card className="border-none shadow-sm"><CardContent className="p-0">
+              <Table>
+                <TableHeader><TableRow><TableHead>Task</TableHead><TableHead>Priority</TableHead><TableHead>Deadline</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {districtTasks.map(t => (
+                    <TableRow key={t.id}>
+                      <TableCell className="font-medium text-sm">{t.title}</TableCell>
+                      <TableCell><Badge variant={t.priority === "Critical" || t.priority === "High" ? "destructive" : "secondary"} className="text-[10px]">{t.priority}</Badge></TableCell>
+                      <TableCell className="text-xs">{t.deadline}</TableCell>
+                      <TableCell><Badge variant={t.status === "Completed" ? "default" : "outline"} className="text-[10px]">{t.status}</Badge></TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {districtTasks.map(t => (
-                      <TableRow key={t.id}>
-                        <TableCell className="font-medium text-sm">{t.title}</TableCell>
-                        <TableCell><Badge variant={t.priority === "Critical" || t.priority === "High" ? "destructive" : "secondary"} className="text-[10px]">{t.priority}</Badge></TableCell>
-                        <TableCell className="text-xs">{t.deadline}</TableCell>
-                        <TableCell><Badge variant={t.status === "Completed" ? "default" : "outline"} className="text-[10px]">{t.status}</Badge></TableCell>
-                      </TableRow>
-                    ))}
-                    {districtTasks.length === 0 && (
-                      <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8 text-sm">No tasks assigned</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                  ))}
+                  {districtTasks.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8 text-sm">No tasks assigned</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </CardContent></Card>
           </TabsContent>
         </Tabs>
       </div>

@@ -1,38 +1,10 @@
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { zones, districts, coordinators, meetings, tasks, goals, districtMeetingRecords } from "@/data/mockData";
+import { useZones, useDistricts, useCoordinators, useMeetings, useTasks, useGoals, useDistrictMeetingRecords, LoadingSkeleton } from "@/hooks/useSupabaseData";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { Building2, Users, MapPin, Calendar, ClipboardList, Target, TrendingUp, CheckCircle, ArrowUpRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-const statCards = [
-  { label: "Total Zones", value: zones.length, icon: MapPin, change: "+0", color: "chart-1" },
-  { label: "Total Districts", value: districts.length, icon: Building2, change: `${districts.length}`, color: "chart-2" },
-  { label: "Active Coordinators", value: coordinators.filter(c => c.status === "Active").length, icon: Users, change: "+5", color: "chart-3" },
-  { label: "Meetings This Month", value: meetings.filter(m => m.month === "2026-03").length, icon: Calendar, change: "+2", color: "chart-4" },
-  { label: "Tasks Assigned", value: tasks.length, icon: ClipboardList, change: `${tasks.length}`, color: "chart-1" },
-  { label: "Goals Completed", value: goals.filter(g => g.status === "Completed").length, icon: CheckCircle, change: `${Math.round(goals.filter(g => g.status === "Completed").length / goals.length * 100)}%`, color: "chart-2" },
-];
-
-const zonePerformance = zones.map(z => ({
-  name: z.name.length > 14 ? z.name.substring(0, 14) + "…" : z.name,
-  districts: z.districtsCount,
-  coordinators: z.coordinatorsCount,
-}));
-
-const goalData = goals.filter(g => g.month === "2026-03").map(g => ({
-  name: `${g.districtName} - ${g.activityName.split(" ")[0]}`,
-  target: g.targetNumber,
-  completed: g.completedNumber || 0,
-}));
-
-const taskStatusData = [
-  { name: "Pending", value: tasks.filter(t => t.status === "Pending").length },
-  { name: "In Progress", value: tasks.filter(t => t.status === "In Progress").length },
-  { name: "Completed", value: tasks.filter(t => t.status === "Completed").length },
-  { name: "Delayed", value: tasks.filter(t => t.status === "Delayed").length },
-].filter(d => d.value > 0);
 
 const COLORS = ["hsl(var(--chart-3))", "hsl(var(--chart-2))", "hsl(var(--chart-1))", "hsl(var(--chart-5))"];
 
@@ -45,14 +17,53 @@ const monthlyTrend = [
   { month: "Mar", activities: 78 },
 ];
 
-const reportStats = {
-  total: districtMeetingRecords.length,
-  completed: districtMeetingRecords.filter(r => r.status === "Completed").length,
-  empty: districtMeetingRecords.filter(r => r.status === "Empty").length,
-};
-
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { data: zones = [], isLoading: zL } = useZones();
+  const { data: districts = [], isLoading: dL } = useDistricts();
+  const { data: coordinators = [], isLoading: cL } = useCoordinators();
+  const { data: meetings = [], isLoading: mL } = useMeetings();
+  const { data: tasks = [], isLoading: tL } = useTasks();
+  const { data: goals = [], isLoading: gL } = useGoals();
+  const { data: dmRecords = [] } = useDistrictMeetingRecords();
+
+  if (zL || dL || cL || mL || tL || gL) return <AppLayout><LoadingSkeleton /></AppLayout>;
+
+  const currentMonth = new Date().toISOString().slice(0, 7);
+
+  const statCards = [
+    { label: "Total Zones", value: zones.length, icon: MapPin, change: `${zones.length}`, color: "chart-1" },
+    { label: "Total Districts", value: districts.length, icon: Building2, change: `${districts.length}`, color: "chart-2" },
+    { label: "Active Coordinators", value: coordinators.filter(c => c.status === "Active").length, icon: Users, change: "+5", color: "chart-3" },
+    { label: "Meetings This Month", value: meetings.filter(m => m.month === currentMonth).length, icon: Calendar, change: "+2", color: "chart-4" },
+    { label: "Tasks Assigned", value: tasks.length, icon: ClipboardList, change: `${tasks.length}`, color: "chart-1" },
+    { label: "Goals Completed", value: goals.filter(g => g.status === "Completed").length, icon: CheckCircle, change: goals.length > 0 ? `${Math.round(goals.filter(g => g.status === "Completed").length / goals.length * 100)}%` : "0%", color: "chart-2" },
+  ];
+
+  const zonePerformance = zones.map(z => ({
+    name: z.name.length > 14 ? z.name.substring(0, 14) + "…" : z.name,
+    districts: districts.filter(d => d.zone === z.name).length,
+    coordinators: coordinators.filter(c => c.zone === z.name && c.status === "Active").length,
+  }));
+
+  const goalData = goals.filter(g => g.month === currentMonth).map(g => ({
+    name: `${g.districtName} - ${g.activityName.split(" ")[0]}`,
+    target: g.targetNumber,
+    completed: g.completedNumber || 0,
+  }));
+
+  const taskStatusData = [
+    { name: "Pending", value: tasks.filter(t => t.status === "Pending").length },
+    { name: "In Progress", value: tasks.filter(t => t.status === "In Progress").length },
+    { name: "Completed", value: tasks.filter(t => t.status === "Completed").length },
+    { name: "Delayed", value: tasks.filter(t => t.status === "Delayed").length },
+  ].filter(d => d.value > 0);
+
+  const reportStats = {
+    total: dmRecords.length,
+    completed: dmRecords.filter(r => r.status === "Completed").length,
+    empty: dmRecords.filter(r => r.status === "Empty").length,
+  };
 
   return (
     <AppLayout>
@@ -60,7 +71,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground tracking-tight">MSL ERP Dashboard</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">Organization performance overview · March 2026</p>
+            <p className="text-muted-foreground text-sm mt-0.5">Organization performance overview</p>
           </div>
           <Badge variant="secondary" className="hidden sm:flex gap-1 text-xs">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -68,7 +79,6 @@ export default function Dashboard() {
           </Badge>
         </div>
 
-        {/* Stat Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {statCards.map((stat) => (
             <Card key={stat.label} className="border-none shadow-sm hover:shadow-md transition-all cursor-pointer group">
@@ -88,7 +98,6 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Quick Stats Bar */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Card className="border-none shadow-sm bg-gradient-to-r from-emerald-500 to-emerald-600 text-white cursor-pointer" onClick={() => navigate("/meetings")}>
             <CardContent className="p-4 flex items-center justify-between">
@@ -112,19 +121,16 @@ export default function Dashboard() {
             <CardContent className="p-4 flex items-center justify-between">
               <div>
                 <p className="text-amber-100 text-xs font-medium">Goals Achievement</p>
-                <p className="text-2xl font-bold">{Math.round(goals.filter(g => g.status === "Completed").length / goals.length * 100)}%</p>
+                <p className="text-2xl font-bold">{goals.length > 0 ? Math.round(goals.filter(g => g.status === "Completed").length / goals.length * 100) : 0}%</p>
               </div>
               <ArrowUpRight className="h-5 w-5 text-amber-200" />
             </CardContent>
           </Card>
         </div>
 
-        {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card className="border-none shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Zone Overview</CardTitle>
-            </CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Zone Overview</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={zonePerformance}>
@@ -141,9 +147,7 @@ export default function Dashboard() {
           </Card>
 
           <Card className="border-none shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Goals vs Achievement (March)</CardTitle>
-            </CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Goals vs Achievement</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={goalData}>
@@ -162,9 +166,7 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <Card className="border-none shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Task Distribution</CardTitle>
-            </CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Task Distribution</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
@@ -188,9 +190,7 @@ export default function Dashboard() {
           </Card>
 
           <Card className="border-none shadow-sm lg:col-span-2">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Monthly Activities Trend</CardTitle>
-            </CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Monthly Activities Trend</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
                 <LineChart data={monthlyTrend}>
@@ -205,7 +205,6 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Recent Tasks */}
         <Card className="border-none shadow-sm">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -222,15 +221,12 @@ export default function Dashboard() {
                     <p className="text-xs text-muted-foreground">{task.districtName || task.zone} · Due {task.deadline}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant={task.priority === "Critical" || task.priority === "High" ? "destructive" : "secondary"} className="text-[10px]">
-                      {task.priority}
-                    </Badge>
-                    <Badge variant={task.status === "Completed" ? "default" : "outline"} className="text-[10px]">
-                      {task.status}
-                    </Badge>
+                    <Badge variant={task.priority === "Critical" || task.priority === "High" ? "destructive" : "secondary"} className="text-[10px]">{task.priority}</Badge>
+                    <Badge variant={task.status === "Completed" ? "default" : "outline"} className="text-[10px]">{task.status}</Badge>
                   </div>
                 </div>
               ))}
+              {tasks.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">No tasks yet</p>}
             </div>
           </CardContent>
         </Card>
