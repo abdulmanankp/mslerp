@@ -13,7 +13,8 @@ import { districts, coordinators, districtMeetingRecords, goals, tasks, meetings
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, User, Calendar, Target, ClipboardList, FileText, Plus, Download, Eye } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { History } from "lucide-react";
 
 export default function DistrictProfile() {
   const { id } = useParams();
