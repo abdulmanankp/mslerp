@@ -12,11 +12,13 @@ import {
   Settings,
   ChevronLeft,
   Menu,
-  Shield,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -35,6 +37,16 @@ export default function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const { user, userRole, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login", { replace: true });
+  };
+
+  const displayName = user?.email?.split("@")[0] || "User";
+  const roleLabel = userRole || "User";
 
   return (
     <>
@@ -120,19 +132,41 @@ export default function AppSidebar() {
           })}
         </nav>
 
-        {/* Footer */}
+        {/* Footer with user info & logout */}
         <div className={cn("border-t border-sidebar-border shrink-0", collapsed ? "p-2" : "p-4")}>
           <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 flex items-center justify-center ring-2 ring-emerald-500/30">
-              <span className="text-xs font-bold text-emerald-400">PA</span>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center ring-2 ring-primary/30 shrink-0">
+              <span className="text-xs font-bold text-primary">{displayName.slice(0, 2).toUpperCase()}</span>
             </div>
             {!collapsed && (
-              <div>
-                <p className="text-sm font-semibold text-sidebar-foreground">President Admin</p>
-                <p className="text-[10px] text-sidebar-foreground/40 font-medium">Super Admin</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-sidebar-foreground truncate">{displayName}</p>
+                <p className="text-[10px] text-sidebar-foreground/40 font-medium capitalize">{roleLabel}</p>
               </div>
             )}
+            {!collapsed && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-sidebar-foreground/50 hover:text-destructive hover:bg-destructive/10 shrink-0"
+                onClick={handleSignOut}
+                title="Sign out"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            )}
           </div>
+          {collapsed && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="w-full mt-2 h-8 text-sidebar-foreground/50 hover:text-destructive hover:bg-destructive/10"
+              onClick={handleSignOut}
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </aside>
     </>
