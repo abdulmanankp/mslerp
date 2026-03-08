@@ -150,6 +150,153 @@ export default function DistrictProfile() {
             </Card>
           </TabsContent>
 
+          {/* Monthly Records Tab */}
+          <TabsContent value="monthly-records" className="space-y-4">
+            {(() => {
+              const months = [...new Set(dmRecords.map(r => r.month))].sort().reverse();
+              const monthGoals = districtGoals;
+              const filteredRecords = selectedMonth === "all" ? dmRecords : dmRecords.filter(r => r.month === selectedMonth);
+              const filteredGoals = selectedMonth === "all" ? monthGoals : monthGoals.filter(g => g.month === selectedMonth);
+
+              return (
+                <>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">Previous Monthly Records</h3>
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                      <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filter by month" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Months</SelectItem>
+                        {months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Monthly Activity Summary */}
+                  <Card className="border-none shadow-sm">
+                    <CardHeader className="pb-2"><CardTitle className="text-sm">Activity Reports by Month</CardTitle></CardHeader>
+                    <CardContent className="p-0">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Month</TableHead>
+                            <TableHead>Meeting</TableHead>
+                            <TableHead>Activities Done</TableHead>
+                            <TableHead>Custom Activities</TableHead>
+                            <TableHead>Attendance</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredRecords.map(record => {
+                            const totalAct = record.activityReports.reduce((s, ar) => s + ar.completedQuantity, 0);
+                            return (
+                              <TableRow key={record.id}>
+                                <TableCell className="font-medium text-sm">{record.month}</TableCell>
+                                <TableCell className="text-xs text-muted-foreground">{record.meetingTitle}</TableCell>
+                                <TableCell className="font-mono text-sm">{totalAct}</TableCell>
+                                <TableCell className="font-mono text-sm">{record.customActivities.length}</TableCell>
+                                <TableCell>
+                                  {record.attendance ? (
+                                    <Badge variant={record.attendance === "Present" ? "default" : record.attendance === "Late" ? "secondary" : "destructive"} className="text-[10px]">{record.attendance}</Badge>
+                                  ) : <span className="text-xs text-muted-foreground">—</span>}
+                                </TableCell>
+                                <TableCell><Badge variant={record.status === "Completed" ? "default" : "outline"} className="text-[10px]">{record.status}</Badge></TableCell>
+                                <TableCell className="text-right">
+                                  <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate(`/meetings/${record.meetingId}/report/${district.id}`)}>
+                                    <Eye className="h-3 w-3" /> View
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                          {filteredRecords.length === 0 && (
+                            <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8 text-sm">No records for this period</TableCell></TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+
+                  {/* Monthly Goals Progress */}
+                  <Card className="border-none shadow-sm">
+                    <CardHeader className="pb-2"><CardTitle className="text-sm">Goals Progress by Month</CardTitle></CardHeader>
+                    <CardContent className="p-0">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Month</TableHead>
+                            <TableHead>Activity</TableHead>
+                            <TableHead>Target</TableHead>
+                            <TableHead>Completed</TableHead>
+                            <TableHead>Progress</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredGoals.map(g => {
+                            const progress = g.targetNumber > 0 ? Math.round(((g.completedNumber || 0) / g.targetNumber) * 100) : 0;
+                            return (
+                              <TableRow key={g.id}>
+                                <TableCell className="font-medium text-sm">{g.month}</TableCell>
+                                <TableCell className="text-sm">{g.activityName}</TableCell>
+                                <TableCell className="font-mono">{g.targetNumber}</TableCell>
+                                <TableCell className="font-mono">{g.completedNumber || 0}</TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                                      <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(progress, 100)}%` }} />
+                                    </div>
+                                    <span className="text-[10px] font-mono text-muted-foreground">{progress}%</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell><Badge variant={g.status === "Completed" ? "default" : g.status === "Partially Completed" ? "secondary" : "outline"} className="text-[10px]">{g.status}</Badge></TableCell>
+                              </TableRow>
+                            );
+                          })}
+                          {filteredGoals.length === 0 && (
+                            <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8 text-sm">No goals for this period</TableCell></TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+
+                  {/* Next Month Tasks from Reports */}
+                  {filteredRecords.some(r => r.nextMonthTasks.length > 0) && (
+                    <Card className="border-none shadow-sm">
+                      <CardHeader className="pb-2"><CardTitle className="text-sm">Planned Tasks from Reports</CardTitle></CardHeader>
+                      <CardContent className="p-0">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Month</TableHead>
+                              <TableHead>Task</TableHead>
+                              <TableHead>Type</TableHead>
+                              <TableHead>Target</TableHead>
+                              <TableHead>Deadline</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {filteredRecords.flatMap(r => r.nextMonthTasks.map(t => (
+                              <TableRow key={t.id}>
+                                <TableCell className="text-sm font-medium">{r.month}</TableCell>
+                                <TableCell className="text-sm">{t.taskName}</TableCell>
+                                <TableCell className="text-xs text-muted-foreground">{t.activityType}</TableCell>
+                                <TableCell className="font-mono">{t.targetQuantity}</TableCell>
+                                <TableCell className="text-xs">{t.deadline || "—"}</TableCell>
+                              </TableRow>
+                            )))}
+                          </TableBody>
+                        </Table>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
+              );
+            })()}
+          </TabsContent>
+
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-4">
             {activityChartData.length > 0 && (
