@@ -21,6 +21,7 @@ export default function DistrictProfile() {
   const navigate = useNavigate();
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState("all");
   const district = districts.find(d => d.id === id);
 
   if (!district) {
