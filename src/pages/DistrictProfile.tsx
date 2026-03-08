@@ -302,9 +302,187 @@ export default function DistrictProfile() {
 
           {/* Goals Tab */}
           <TabsContent value="goals" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Assigned Goals</h3>
+              <Dialog open={goalDialogOpen} onOpenChange={setGoalDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+                    <Plus className="h-3 w-3" /> Assign Goal
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Assign Goal to {district.name}</DialogTitle>
+                    <DialogDescription>Set a monthly activity goal for this district.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs">District</Label>
+                        <Input value={district.name} disabled className="bg-muted/50" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Zone</Label>
+                        <Input value={district.zone} disabled className="bg-muted/50" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Activity</Label>
+                      <Select>
+                        <SelectTrigger><SelectValue placeholder="Select activity..." /></SelectTrigger>
+                        <SelectContent>
+                          {activities.filter(a => a.status === "Active").map(a => (
+                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs">Month</Label>
+                        <Input type="month" defaultValue="2026-04" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Target Number</Label>
+                        <Input type="number" placeholder="e.g., 10" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Notes (Optional)</Label>
+                      <Textarea placeholder="Goal notes..." rows={2} />
+                    </div>
+                    <Button className="w-full" onClick={() => setGoalDialogOpen(false)}>Assign Goal</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
             <Card className="border-none shadow-sm">
               <CardContent className="p-0">
                 <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Activity</TableHead>
+                      <TableHead>Month</TableHead>
+                      <TableHead>Target</TableHead>
+                      <TableHead>Completed</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {districtGoals.map(g => (
+                      <TableRow key={g.id}>
+                        <TableCell className="font-medium text-sm">{g.activityName}</TableCell>
+                        <TableCell className="text-xs">{g.month}</TableCell>
+                        <TableCell className="font-mono">{g.targetNumber}</TableCell>
+                        <TableCell className="font-mono">{g.completedNumber || "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant={g.status === "Completed" ? "default" : g.status === "Partially Completed" ? "secondary" : "outline"} className="text-[10px]">{g.status}</Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {districtGoals.length === 0 && (
+                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8 text-sm">No goals assigned</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Tasks Tab */}
+          <TabsContent value="tasks" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Assigned Tasks</h3>
+              <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+                    <Plus className="h-3 w-3" /> Add Task
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Add Task for {district.name}</DialogTitle>
+                    <DialogDescription>Assign a new task to this district.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs">District</Label>
+                        <Input value={district.name} disabled className="bg-muted/50" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Zone</Label>
+                        <Input value={district.zone} disabled className="bg-muted/50" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Task Title</Label>
+                      <Input placeholder="e.g., Organize Quran Classes" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Department (Optional)</Label>
+                      <Input placeholder="e.g., Education" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs">Start Date</Label>
+                        <Input type="date" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Deadline</Label>
+                        <Input type="date" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Priority</Label>
+                      <Select defaultValue="Medium">
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Low">Low</SelectItem>
+                          <SelectItem value="Medium">Medium</SelectItem>
+                          <SelectItem value="High">High</SelectItem>
+                          <SelectItem value="Critical">Critical</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button className="w-full" onClick={() => setTaskDialogOpen(false)}>Add Task</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+            <Card className="border-none shadow-sm">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Task</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Deadline</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {districtTasks.map(t => (
+                      <TableRow key={t.id}>
+                        <TableCell className="font-medium text-sm">{t.title}</TableCell>
+                        <TableCell><Badge variant={t.priority === "Critical" || t.priority === "High" ? "destructive" : "secondary"} className="text-[10px]">{t.priority}</Badge></TableCell>
+                        <TableCell className="text-xs">{t.deadline}</TableCell>
+                        <TableCell><Badge variant={t.status === "Completed" ? "default" : "outline"} className="text-[10px]">{t.status}</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                    {districtTasks.length === 0 && (
+                      <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8 text-sm">No tasks assigned</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </AppLayout>
+  );
+}
                   <TableHeader>
                     <TableRow>
                       <TableHead>Activity</TableHead>
