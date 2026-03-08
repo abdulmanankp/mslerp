@@ -1,9 +1,12 @@
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { zones, districts, coordinators } from "@/data/mockData";
-import { MapPin, Building2, Users, ArrowRight } from "lucide-react";
+import { MapPin, Building2, Users, ArrowRight, Download, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { exportZoneReportPDF, exportZoneReportExcel } from "@/lib/exportUtils";
 
 export default function Zones() {
   const navigate = useNavigate();
