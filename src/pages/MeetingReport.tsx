@@ -118,9 +118,21 @@ export default function MeetingReport() {
                 <X className="h-3.5 w-3.5" /> Cancel
               </Button>
             )}
-            <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-              <Download className="h-3.5 w-3.5" /> Export
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+                  <Download className="h-3.5 w-3.5" /> Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => record && exportDistrictReportPDF(record)}>
+                  <FileText className="h-3.5 w-3.5 mr-2" /> Export as PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => record && exportDistrictReportExcel(record)}>
+                  <FileText className="h-3.5 w-3.5 mr-2" /> Export as Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button size="sm" className="gap-1.5 text-xs">
               <Save className="h-3.5 w-3.5" /> Save
             </Button>

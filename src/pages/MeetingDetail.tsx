@@ -171,9 +171,17 @@ export default function MeetingDetail() {
                           )}
                         </Button>
                         {record?.status === "Completed" && (
-                          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
-                            <Download className="h-3 w-3" /> Export
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+                                <Download className="h-3 w-3" /> Export
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); exportDistrictReportPDF(record); }}>PDF</DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); exportDistrictReportExcel(record); }}>Excel</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
                       </div>
                     </TableCell>

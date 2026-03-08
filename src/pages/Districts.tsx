@@ -39,7 +39,24 @@ export default function Districts() {
               {filtered.length} districts · {assigned} with coordinators
             </p>
           </div>
-          <Button className="gap-2 shadow-sm"><Plus className="h-4 w-4" /> Add District</Button>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Download className="h-4 w-4" /> Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => exportDistrictsPDF(filtered)}>
+                  <FileText className="h-3.5 w-3.5 mr-2" /> Export PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportDistrictsExcel(filtered)}>
+                  <FileText className="h-3.5 w-3.5 mr-2" /> Export Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button className="gap-2 shadow-sm"><Plus className="h-4 w-4" /> Add District</Button>
+          </div>
         </div>
 
         {/* Filters */}
