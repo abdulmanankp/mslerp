@@ -483,9 +483,6 @@ export default function DistrictProfile() {
     </AppLayout>
   );
 }
-
-
-                    <TableRow>
                       <TableHead>Task</TableHead>
                       <TableHead>Priority</TableHead>
                       <TableHead>Deadline</TableHead>
