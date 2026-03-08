@@ -220,28 +220,36 @@ export default function Coordinators() {
             </div>
             <div className="space-y-1.5"><Label>Address</Label><Input value={formAddress} onChange={e => setFormAddress(e.target.value)} placeholder="Full address" /></div>
             <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Coordinator Type *</Label>
+                <Select value={formCoordinatorType} onValueChange={(v) => { setFormCoordinatorType(v as CoordinatorType); if (v === "Zonal") setFormDistrictId(""); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="Zonal">Zonal Coordinator</SelectItem><SelectItem value="District">District Coordinator</SelectItem></SelectContent>
+                </Select>
+              </div>
               <div className="space-y-1.5"><Label>Education</Label><Input value={formEducation} onChange={e => setFormEducation(e.target.value)} placeholder="e.g. BS Computer Science" /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5"><Label>Status</Label>
                 <Select value={formStatus} onValueChange={(v) => setFormStatus(v as "Active" | "Expired")}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent><SelectItem value="Active">Active</SelectItem><SelectItem value="Expired">Expired</SelectItem></SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5"><Label>Zone *</Label>
                 <Select value={formZone} onValueChange={(v) => { setFormZone(v as ZoneName); setFormDistrictId(""); }}>
                   <SelectTrigger><SelectValue placeholder="Select zone" /></SelectTrigger>
                   <SelectContent>{zones.map(z => <SelectItem key={z.id} value={z.name}>{z.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
+            </div>
+            {formCoordinatorType === "District" && (
               <div className="space-y-1.5"><Label>District *</Label>
                 <Select value={formDistrictId} onValueChange={setFormDistrictId} disabled={!formZone}>
                   <SelectTrigger><SelectValue placeholder="Select district" /></SelectTrigger>
                   <SelectContent>{zoneDistricts.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-            </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5"><Label>Joining Date *</Label><Input type="date" value={formJoiningDate} onChange={e => setFormJoiningDate(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>End Date</Label><Input type="date" value={formEndDate} onChange={e => setFormEndDate(e.target.value)} /></div>
