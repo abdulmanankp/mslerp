@@ -1,0 +1,75 @@
+name: Daily Supabase Backup → Google Drive
+
+# ──────────────────────────────────────────────────────────
+# Runs every day at 02:00 UTC.
+# Also available to trigger manually from GitHub Actions UI.
+# ──────────────────────────────────────────────────────────
+on:
+  schedule:
+    - cron: "0 2 * * *"  # 02:00 UTC = 07:00 PKT (UTC+5)
+  workflow_dispatch:      # Manual trigger button in GitHub UI
+
+jobs:
+  backup:
+    name: Backup Supabase DB to Google Drive
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ── 1. Install PostgreSQL client (pg_dump) ──────────────
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client
+
+      # ── 2. Install rclone ───────────────────────────────────
+      - name: Install rclone
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+
+      # ── 3. Restore rclone Google Drive config from secret ───
+      - name: Configure rclone
+        env:
+          RCLONE_CONFIG_BASE64: ${{ secrets.RCLONE_CONFIG_BASE64 }}
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "$RCLONE_CONFIG_BASE64" | base64 --decode > ~/.config/rclone/rclone.conf
+
+      # ── 4. Dump the Supabase database ────────────────────────
+      - name: Create database dump
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          FILENAME="msl_erp_backup_$(date +%Y-%m-%d).dump"
+          echo "FILENAME=$FILENAME" >> $GITHUB_ENV
+          PGPASSWORD=$(echo "$SUPABASE_DB_URL" | sed -E 's|.*://[^:]+:([^@]+)@.*|\1|') \
+          pg_dump \
+            --no-acl \
+            --no-owner \
+            --format=custom \
+            --compress=9 \
+            "$SUPABASE_DB_URL" \
+            --file="$FILENAME"
+          echo "Backup file size: $(du -sh $FILENAME | cut -f1)"
+
+      # ── 5. Upload dump to Google Drive ───────────────────────
+      - name: Upload to Google Drive
+        run: |
+          rclone copy "$FILENAME" "gdrive:MSL-ERP-Backups/" \
+            --drive-use-trash=false \
+            --log-level INFO
+
+      # ── 6. Delete backups older than 7 days from Drive ──────
+      - name: Remove old backups (keep last 7 days)
+        run: |
+          rclone delete "gdrive:MSL-ERP-Backups/" \
+            --min-age 7d \
+            --drive-use-trash=false \
+            --log-level INFO
+
+      # ── 7. Summary ───────────────────────────────────────────
+      - name: Backup summary
+        run: |
+          echo "✅ Backup uploaded: $FILENAME"
+          echo "📁 Stored in Google Drive → MSL-ERP-Backups/"
+          rclone ls "gdrive:MSL-ERP-Backups/" | sort

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MSL ERP Portal</string>
+    <string name="title_activity_main">MSL ERP Portal</string>
+    <string name="package_name">org.mslpakistan.eportal</string>
+    <string name="custom_url_scheme">org.mslpakistan.eportal</string>
+</resources>
