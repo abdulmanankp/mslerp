@@ -26,7 +26,17 @@ import Settings from "./pages/Settings";
 import PresidentSchedule from "./pages/PresidentSchedule";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Serve cached data instantly on re-navigation; refetch silently in background
+      staleTime: 5 * 60 * 1000,   // 5 minutes
+      gcTime:    10 * 60 * 1000,  // keep cache 10 minutes
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

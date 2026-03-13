@@ -475,10 +475,40 @@ export function useCreatePresidentSchedule() {
 // ─── Loading component ───
 export function LoadingSkeleton() {
   return (
-    <div className="flex items-center justify-center py-20">
-      <div className="flex flex-col items-center gap-3">
-        <img src="/msl-logo.webp" alt="MSL" className="w-10 h-10 animate-pulse" />
-        <p className="text-sm text-muted-foreground">Loading data...</p>
+    <div className="space-y-5 animate-in fade-in duration-300">
+      {/* Page header shimmer */}
+      <div className="space-y-2">
+        <div className="h-7 w-48 rounded-lg bg-muted animate-pulse" />
+        <div className="h-4 w-72 rounded-md bg-muted animate-pulse opacity-60" />
+      </div>
+
+      {/* Stat cards row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />
+        ))}
+      </div>
+
+      {/* Main content blocks */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="h-64 rounded-xl bg-muted animate-pulse" style={{ animationDelay: '120ms' }} />
+        <div className="h-64 rounded-xl bg-muted animate-pulse" style={{ animationDelay: '180ms' }} />
+      </div>
+
+      {/* Table / list shimmer */}
+      <div className="rounded-xl bg-muted/50 border border-border overflow-hidden">
+        <div className="h-11 bg-muted animate-pulse" />
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex gap-4 px-4 py-3 border-t border-border"
+            style={{ animationDelay: `${240 + i * 50}ms` }}
+          >
+            <div className="h-4 rounded-md bg-muted animate-pulse flex-1" />
+            <div className="h-4 w-20 rounded-md bg-muted animate-pulse opacity-70" />
+            <div className="h-4 w-16 rounded-md bg-muted animate-pulse opacity-50" />
+          </div>
+        ))}
       </div>
     </div>
   );

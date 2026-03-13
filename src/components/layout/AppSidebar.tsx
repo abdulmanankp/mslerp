@@ -65,11 +65,11 @@ export default function AppSidebar() {
         onClick={() => setMobileOpen(false)}
       />
 
-      {/* Mobile toggle */}
+      {/* Mobile toggle — hidden on mobile/tablet since BottomNav handles navigation */}
       <Button
         variant="ghost"
         size="icon"
-        className="fixed top-3 left-3 z-50 lg:hidden bg-card shadow-md border border-border"
+        className="fixed top-3 left-3 z-50 hidden bg-card shadow-md border border-border"
         onClick={() => setMobileOpen(!mobileOpen)}
       >
         <Menu className="h-5 w-5" />
