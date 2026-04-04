@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useDistricts, useCoordinators, useZones, LoadingSkeleton } from "@/hooks/useSupabaseData";
+import { useDistricts, useCoordinators, useZones, LoadingSkeleton } from "@/hooks/useFirebaseData";
 import { Search, Plus, Building2, Download, FileText } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState } from "react";
@@ -86,7 +86,7 @@ export default function Districts() {
           </Select>
         </div>
 
-        <Card className="border-none shadow-sm">
+        <Card>
           <CardContent className="p-0">
             <Table>
               <TableHeader>

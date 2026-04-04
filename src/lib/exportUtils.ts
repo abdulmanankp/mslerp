@@ -10,6 +10,9 @@ import type {
   DistrictMeetingRecord,
   University,
   UniversityCoordinator,
+  UniversityMeeting,
+  UniversityMeetingRecord,
+  UniversityGoal,
   MadadgarTeam,
   MadadgarCoordinator,
 } from "@/types";
@@ -88,6 +91,24 @@ export function exportDistrictReportPDF(record: DistrictMeetingRecord, districts
       head: [["Activity", "Quantity", "Description"]],
       body: record.customActivities.map(ca => [ca.name, ca.quantity, ca.description || ""]),
       styles: { fontSize: 8, cellPadding: 3 }, headStyles: { fillColor: [59, 130, 246] }, theme: "grid",
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
+  }
+
+  if (record.mediaReport) {
+    doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.text("Media Report", 14, y + 4); y += 8;
+    autoTable(doc, {
+      startY: y,
+      head: [["Content Production", "Reels", "Media Posting", "Facebook Page", "Followers", "Posting Frequency"]],
+      body: [[
+        String(record.mediaReport.contentProduction || 0),
+        String(record.mediaReport.reels || 0),
+        String(record.mediaReport.mediaPosting || 0),
+        record.mediaReport.hasFacebookPage ? "Yes" : "No",
+        String(record.mediaReport.hasFacebookPage ? (record.mediaReport.facebookFollowers || 0) : 0),
+        record.mediaReport.hasFacebookPage ? record.mediaReport.postingFrequency : "N/A",
+      ]],
+      styles: { fontSize: 8, cellPadding: 3 }, headStyles: { fillColor: [14, 116, 144] }, theme: "grid",
     });
     y = (doc as any).lastAutoTable.finalY + 6;
   }
@@ -237,6 +258,65 @@ export function exportFullMeetingExcel(meeting: Meeting, records: DistrictMeetin
   XLSX.writeFile(wb, `${meeting.title.replace(/\s+/g, "_")}_Report.xlsx`);
 }
 
+// ─── Monthly Overall Meetings Export (Excel) ───
+
+export function exportMonthlyOverallMeetingsExcel(month: string, meetings: Meeting[], records: DistrictMeetingRecord[], districts: District[]) {
+  const monthMeetings = meetings.filter((meeting) => meeting.month === month);
+  const wb = XLSX.utils.book_new();
+
+  const meetingSummaryRows = monthMeetings.map((meeting) => {
+    const meetingRecords = records.filter((record) => record.meetingId === meeting.id);
+    const totalActivities = meetingRecords.reduce(
+      (sum, record) => sum + record.activityReports.reduce((inner, activity) => inner + activity.completedQuantity, 0),
+      0,
+    );
+
+    return {
+      Meeting: meeting.title,
+      Date: meeting.meetingDate,
+      Scope: meeting.scope === "All" ? "All Districts" : meeting.scopeValue || meeting.scope,
+      Districts: meeting.districtIds.length,
+      "Completed Reports": meetingRecords.filter((record) => record.status === "Completed").length,
+      "Present Attendance": meetingRecords.filter((record) => record.attendance === "Present").length,
+      "Total Activities": totalActivities,
+    };
+  });
+
+  const districtRows: Array<Record<string, string | number>> = [];
+  for (const meeting of monthMeetings) {
+    const meetingRecords = records.filter((record) => record.meetingId === meeting.id);
+    for (const record of meetingRecords) {
+      const district = districts.find((d) => d.id === record.districtId);
+      districtRows.push({
+        Meeting: meeting.title,
+        Date: meeting.meetingDate,
+        District: district?.name || record.districtName,
+        Zone: district?.zone || "",
+        Division: district?.division || "",
+        Status: record.status,
+        Attendance: record.attendance || "N/A",
+        Activities: record.activityReports.length,
+        "Total Completed": record.activityReports.reduce((sum, activity) => sum + activity.completedQuantity, 0),
+      });
+    }
+  }
+
+  const totals = {
+    Month: month,
+    Meetings: monthMeetings.length,
+    DistrictReports: districtRows.length,
+    CompletedReports: districtRows.filter((row) => row.Status === "Completed").length,
+    PresentAttendance: districtRows.filter((row) => row.Attendance === "Present").length,
+    ActivitiesDone: districtRows.reduce((sum, row) => sum + Number(row["Total Completed"] || 0), 0),
+  };
+
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(meetingSummaryRows), "Meetings Summary");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(districtRows), "District Details");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([totals]), "Totals");
+
+  XLSX.writeFile(wb, `${month.replace(/[^\w-]/g, "_")}_Monthly_Overall_Report.xlsx`);
+}
+
 // ─── Export Single District Report (Excel) ───
 
 export function exportDistrictReportExcel(record: DistrictMeetingRecord, districts: District[]) {
@@ -256,7 +336,308 @@ export function exportDistrictReportExcel(record: DistrictMeetingRecord, distric
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(tasks), "Next Month Tasks");
   }
 
+  if (record.mediaReport) {
+    const media = [{
+      "Content Production": record.mediaReport.contentProduction || 0,
+      Reels: record.mediaReport.reels || 0,
+      "Media Posting": record.mediaReport.mediaPosting || 0,
+      "Facebook Page": record.mediaReport.hasFacebookPage ? "Yes" : "No",
+      "Facebook Followers": record.mediaReport.hasFacebookPage ? (record.mediaReport.facebookFollowers || 0) : 0,
+      "Posting Frequency": record.mediaReport.hasFacebookPage ? record.mediaReport.postingFrequency : "N/A",
+    }];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(media), "Media Report");
+  }
+
   XLSX.writeFile(wb, `${record.districtName}_${record.month}_Report.xlsx`);
+}
+
+export function exportUniversityReportPDF(
+  record: UniversityMeetingRecord,
+  universities: University[],
+  meetings: UniversityMeeting[],
+  campaigns: UniversityGoal[],
+) {
+  const doc = new jsPDF();
+  const university = universities.find((u) => u.id === record.universityId);
+  const meeting = meetings.find((m) => m.id === record.meetingId);
+  const linkedCampaigns = campaigns.filter(
+    (c) => c.universityId === record.universityId && c.startedInMeetingId === record.meetingId,
+  );
+
+  addHeader(
+    doc,
+    `University Report: ${record.universityName}`,
+    `${meeting?.title || record.meetingTitle} · ${record.meetingDate} · ${university?.province || ""}`,
+  );
+
+  let y = 42;
+  const totalActivities = record.activityReports.reduce((s, a) => s + a.completedQuantity, 0);
+  const totalCampaignTarget = linkedCampaigns.reduce((s, c) => s + (c.targetNumber || 0), 0);
+  const totalCampaignCompleted = linkedCampaigns.reduce((s, c) => s + (c.completedNumber || 0), 0);
+  const performance = totalCampaignTarget > 0 ? Math.round((totalCampaignCompleted / totalCampaignTarget) * 100) : 0;
+
+  y = addSummaryBox(doc, y, [
+    { label: "Status", value: record.status },
+    { label: "Attendance", value: record.attendance || "N/A" },
+    { label: "Activities", value: record.activityReports.length },
+    { label: "Performance", value: `${performance}%` },
+  ]);
+
+  if (record.activityReports.length > 0) {
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Activity Reports", 14, y + 4);
+    y += 8;
+    autoTable(doc, {
+      startY: y,
+      head: [["Activity", "Completed", "Description", "Notes"]],
+      body: record.activityReports.map((ar) => [ar.activityName, ar.completedQuantity, ar.description || "", ar.notes || ""]),
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [16, 185, 129] },
+      theme: "grid",
+    });
+    y = (doc as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
+  }
+
+  if (record.customActivities.length > 0) {
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Custom Activities", 14, y + 4);
+    y += 8;
+    autoTable(doc, {
+      startY: y,
+      head: [["Activity", "Quantity", "Description"]],
+      body: record.customActivities.map((ca) => [ca.name, ca.quantity, ca.description || ""]),
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [59, 130, 246] },
+      theme: "grid",
+    });
+    y = (doc as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
+  }
+
+  if (linkedCampaigns.length > 0) {
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Campaigns Started In This Meeting", 14, y + 4);
+    y += 8;
+    autoTable(doc, {
+      startY: y,
+      head: [["Campaign", "Scenario", "Target", "Completed", "Approached", "Successful", "Conversion", "Status", "Performance"]],
+      body: linkedCampaigns.map((c) => {
+        const pct = c.targetNumber > 0 ? Math.round(((c.completedNumber || 0) / c.targetNumber) * 100) : 0;
+        const conversion = (c.approachedStudents || 0) > 0 ? Math.round(((c.successfulStudents || 0) / (c.approachedStudents || 1)) * 100) : 0;
+        return [
+          c.activityName,
+          c.scenario || "Custom",
+          c.targetNumber,
+          c.completedNumber || 0,
+          c.approachedStudents || 0,
+          c.successfulStudents || 0,
+          `${conversion}%`,
+          c.status || "Pending",
+          `${pct}%`,
+        ];
+      }),
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [245, 158, 11] },
+      theme: "grid",
+    });
+    y = (doc as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
+  }
+
+  if (record.notes) {
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Notes & Comments", 14, y + 4);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    const lines = doc.splitTextToSize(record.notes, 180);
+    doc.text(lines, 14, y + 10);
+    y += 10 + lines.length * 4 + 4;
+  }
+
+  if (record.nextMonthTasks.length > 0) {
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Next Month Tasks", 14, y + 4);
+    y += 8;
+    autoTable(doc, {
+      startY: y,
+      head: [["Task", "Activity Type", "Target", "Deadline", "Notes"]],
+      body: record.nextMonthTasks.map((t) => [t.taskName, t.activityType, t.targetQuantity, t.deadline || "", t.notes || ""]),
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [139, 92, 246] },
+      theme: "grid",
+    });
+  }
+
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7);
+    doc.setTextColor(150);
+    doc.text(`MSL ERP Portal · Generated ${new Date().toLocaleString()} · Page ${i}/${pageCount}`, 14, 290);
+  }
+  doc.save(`${record.universityName}_${record.month}_Report.pdf`);
+}
+
+export function exportUniversityReportExcel(record: UniversityMeetingRecord, campaigns: UniversityGoal[]) {
+  const wb = XLSX.utils.book_new();
+  const linkedCampaigns = campaigns.filter(
+    (c) => c.universityId === record.universityId && c.startedInMeetingId === record.meetingId,
+  );
+
+  const info = [{
+    University: record.universityName,
+    Meeting: record.meetingTitle,
+    Date: record.meetingDate,
+    Status: record.status,
+    Attendance: record.attendance || "N/A",
+    Notes: record.notes,
+  }];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(info), "Info");
+
+  if (record.activityReports.length > 0) {
+    const acts = record.activityReports.map((ar) => ({
+      Activity: ar.activityName,
+      Completed: ar.completedQuantity,
+      Description: ar.description || "",
+      Notes: ar.notes || "",
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(acts), "Activities");
+  }
+
+  if (record.customActivities.length > 0) {
+    const customRows = record.customActivities.map((ca) => ({
+      Activity: ca.name,
+      Quantity: ca.quantity,
+      Description: ca.description || "",
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(customRows), "Custom Activities");
+  }
+
+  if (record.nextMonthTasks.length > 0) {
+    const taskRows = record.nextMonthTasks.map((t) => ({
+      Task: t.taskName,
+      "Activity Type": t.activityType,
+      Target: t.targetQuantity,
+      Deadline: t.deadline || "",
+      Notes: t.notes || "",
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(taskRows), "Next Month Tasks");
+  }
+
+  if (linkedCampaigns.length > 0) {
+    const campaignRows = linkedCampaigns.map((c) => ({
+      Campaign: c.activityName,
+      Scenario: c.scenario || "Custom",
+      Target: c.targetNumber,
+      Completed: c.completedNumber || 0,
+      Approached: c.approachedStudents || 0,
+      Successful: c.successfulStudents || 0,
+      Conversion: (c.approachedStudents || 0) > 0 ? `${Math.round(((c.successfulStudents || 0) / (c.approachedStudents || 1)) * 100)}%` : "0%",
+      Status: c.status || "Pending",
+      Performance: c.targetNumber > 0 ? `${Math.round(((c.completedNumber || 0) / c.targetNumber) * 100)}%` : "0%",
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(campaignRows), "Campaigns");
+  }
+
+  XLSX.writeFile(wb, `${record.universityName}_${record.month}_Report.xlsx`);
+}
+
+export function exportUniversityCampaignAnalyticsExcel(university: University, goals: UniversityGoal[]) {
+  const wb = XLSX.utils.book_new();
+
+  const rows = goals.map((goal) => ({
+    Month: goal.month,
+    Activity: goal.activityName,
+    Scenario: goal.scenario || "Custom",
+    Target: goal.targetNumber,
+    Completed: goal.completedNumber || 0,
+    Performance: goal.targetNumber > 0 ? `${Math.round(((goal.completedNumber || 0) / goal.targetNumber) * 100)}%` : "0%",
+    Approached: goal.approachedStudents || 0,
+    Successful: goal.successfulStudents || 0,
+    Conversion: (goal.approachedStudents || 0) > 0 ? `${Math.round(((goal.successfulStudents || 0) / (goal.approachedStudents || 1)) * 100)}%` : "0%",
+    Status: goal.status || "Pending",
+    "Started In Meeting": goal.startedInMeetingTitle || "",
+    Notes: goal.notes || "",
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Campaigns");
+
+  const byScenario = goals.reduce((acc, goal) => {
+    const scenario = goal.scenario || "Custom";
+    const curr = acc.get(scenario) || { campaigns: 0, target: 0, completed: 0, approached: 0, successful: 0 };
+    curr.campaigns += 1;
+    curr.target += goal.targetNumber || 0;
+    curr.completed += goal.completedNumber || 0;
+    curr.approached += goal.approachedStudents || 0;
+    curr.successful += goal.successfulStudents || 0;
+    acc.set(scenario, curr);
+    return acc;
+  }, new Map<string, { campaigns: number; target: number; completed: number; approached: number; successful: number }>());
+
+  const summaryRows = Array.from(byScenario.entries()).map(([scenario, row]) => ({
+    Scenario: scenario,
+    Campaigns: row.campaigns,
+    Target: row.target,
+    Completed: row.completed,
+    Performance: row.target > 0 ? `${Math.round((row.completed / row.target) * 100)}%` : "0%",
+    Approached: row.approached,
+    Successful: row.successful,
+    Conversion: row.approached > 0 ? `${Math.round((row.successful / row.approached) * 100)}%` : "0%",
+  }));
+
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), "Scenario Summary");
+  XLSX.writeFile(wb, `${university.name}_Campaign_Analytics.xlsx`);
+}
+
+export function exportUniversityCampaignAnalyticsPDF(university: University, goals: UniversityGoal[]) {
+  const doc = new jsPDF();
+  addHeader(doc, `University Campaign Analytics`, `${university.name} · ${university.city}, ${university.province}`);
+
+  const totalTarget = goals.reduce((sum, g) => sum + (g.targetNumber || 0), 0);
+  const totalCompleted = goals.reduce((sum, g) => sum + (g.completedNumber || 0), 0);
+  const totalApproached = goals.reduce((sum, g) => sum + (g.approachedStudents || 0), 0);
+  const totalSuccessful = goals.reduce((sum, g) => sum + (g.successfulStudents || 0), 0);
+
+  let y = addSummaryBox(doc, 42, [
+    { label: "Campaigns", value: goals.length },
+    { label: "Performance", value: totalTarget > 0 ? `${Math.round((totalCompleted / totalTarget) * 100)}%` : "0%" },
+    { label: "Approached", value: totalApproached },
+    { label: "Conversion", value: totalApproached > 0 ? `${Math.round((totalSuccessful / totalApproached) * 100)}%` : "0%" },
+  ]);
+
+  y += 4;
+  autoTable(doc, {
+    startY: y,
+    head: [["Month", "Campaign", "Scenario", "Target", "Completed", "Approached", "Successful", "Conversion", "Status"]],
+    body: goals.map((goal) => {
+      const conversion = (goal.approachedStudents || 0) > 0 ? Math.round(((goal.successfulStudents || 0) / (goal.approachedStudents || 1)) * 100) : 0;
+      return [
+        goal.month,
+        goal.activityName,
+        goal.scenario || "Custom",
+        goal.targetNumber,
+        goal.completedNumber || 0,
+        goal.approachedStudents || 0,
+        goal.successfulStudents || 0,
+        `${conversion}%`,
+        goal.status || "Pending",
+      ];
+    }),
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [16, 185, 129] },
+    theme: "grid",
+  });
+
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7);
+    doc.setTextColor(150);
+    doc.text(`MSL ERP Portal · Generated ${new Date().toLocaleString()} · Page ${i}/${pageCount}`, 14, 290);
+  }
+  doc.save(`${university.name}_Campaign_Analytics.pdf`);
 }
 
 // ─── Zone Report Export (PDF) ───

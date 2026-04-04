@@ -16,7 +16,7 @@ import {
   usePresidentSchedules,
   useUniversities,
   useZones,
-} from "@/hooks/useSupabaseData";
+} from "@/hooks/useFirebaseData";
 import { useAuth } from "@/contexts/useAuth";
 import type { ScheduleFrequency, ScheduleTargetType } from "@/types";
 

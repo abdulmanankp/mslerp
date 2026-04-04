@@ -1,21 +1,47 @@
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useZones, useDistricts, useCoordinators, useMeetings, useTasks, useGoals, useDistrictMeetingRecords, useUniversities, useMadadgarTeams, usePresidentSchedules, LoadingSkeleton } from "@/hooks/useSupabaseData";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
-import { Building2, Users, MapPin, Calendar, ClipboardList, Target, TrendingUp, CheckCircle, ArrowUpRight } from "lucide-react";
+import {
+  useZones,
+  useDistricts,
+  useCoordinators,
+  useMeetings,
+  useTasks,
+  useGoals,
+  useDistrictMeetingRecords,
+  useUniversities,
+  useMadadgarTeams,
+  usePresidentSchedules,
+  LoadingSkeleton,
+} from "@/hooks/useFirebaseData";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+  Legend,
+} from "recharts";
+import {
+  Building2,
+  Users,
+  Calendar,
+  CalendarDays,
+  CheckCircle2,
+  BellRing,
+  Clock3,
+  ArrowUpRight,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const COLORS = ["hsl(var(--chart-3))", "hsl(var(--chart-2))", "hsl(var(--chart-1))", "hsl(var(--chart-5))"];
-
-const monthlyTrend = [
-  { month: "Oct", activities: 32 },
-  { month: "Nov", activities: 41 },
-  { month: "Dec", activities: 38 },
-  { month: "Jan", activities: 45 },
-  { month: "Feb", activities: 62 },
-  { month: "Mar", activities: 78 },
-];
+const COLORS = ["#014f35", "#1b7d59", "#2ea877", "#8fd0b8"];
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -30,140 +56,356 @@ export default function Dashboard() {
   const { data: presidentSchedules = [], isLoading: psL } = usePresidentSchedules();
   const { data: dmRecords = [] } = useDistrictMeetingRecords();
 
-  if (zL || dL || cL || mL || uL || mdL || tL || gL || psL) return <AppLayout><LoadingSkeleton /></AppLayout>;
+  if (zL || dL || cL || mL || uL || mdL || tL || gL || psL) {
+    return (
+      <AppLayout>
+        <LoadingSkeleton />
+      </AppLayout>
+    );
+  }
 
   const currentMonth = new Date().toISOString().slice(0, 7);
-
-  const statCards = [
-    { label: "Total Zones", value: zones.length, icon: MapPin, change: `${zones.length}`, color: "chart-1" },
-    { label: "Total Districts", value: districts.length, icon: Building2, change: `${districts.length}`, color: "chart-2" },
-    { label: "Universities", value: universities.length, icon: Building2, change: `${universities.length}`, color: "chart-4" },
-    { label: "Madadgar Teams", value: madadgarTeams.length, icon: Users, change: `${madadgarTeams.length}`, color: "chart-3" },
-    { label: "Active Coordinators", value: coordinators.filter(c => c.status === "Active").length, icon: Users, change: "+5", color: "chart-3" },
-    { label: "Meetings This Month", value: meetings.filter(m => m.month === currentMonth).length, icon: Calendar, change: "+2", color: "chart-4" },
-    { label: "Tasks Assigned", value: tasks.length, icon: ClipboardList, change: `${tasks.length}`, color: "chart-1" },
-    { label: "President Schedules", value: presidentSchedules.length, icon: Calendar, change: `${presidentSchedules.length}`, color: "chart-4" },
-    { label: "Goals Completed", value: goals.filter(g => g.status === "Completed").length, icon: CheckCircle, change: goals.length > 0 ? `${Math.round(goals.filter(g => g.status === "Completed").length / goals.length * 100)}%` : "0%", color: "chart-2" },
-  ];
-
-  const zonePerformance = zones.map(z => ({
-    name: z.name.length > 14 ? z.name.substring(0, 14) + "…" : z.name,
-    districts: districts.filter(d => d.zone === z.name).length,
-    coordinators: coordinators.filter(c => c.zone === z.name && c.status === "Active").length,
-  }));
-
-  const goalData = goals.filter(g => g.month === currentMonth).map(g => ({
-    name: `${g.districtName} - ${g.activityName.split(" ")[0]}`,
-    target: g.targetNumber,
-    completed: g.completedNumber || 0,
-  }));
-
-  const taskStatusData = [
-    { name: "Pending", value: tasks.filter(t => t.status === "Pending").length },
-    { name: "In Progress", value: tasks.filter(t => t.status === "In Progress").length },
-    { name: "Completed", value: tasks.filter(t => t.status === "Completed").length },
-    { name: "Delayed", value: tasks.filter(t => t.status === "Delayed").length },
-  ].filter(d => d.value > 0);
+  const today = new Date().toISOString().slice(0, 10);
 
   const reportStats = {
     total: dmRecords.length,
-    completed: dmRecords.filter(r => r.status === "Completed").length,
-    empty: dmRecords.filter(r => r.status === "Empty").length,
+    completed: dmRecords.filter((r) => r.status === "Completed").length,
+    pending: dmRecords.filter((r) => r.status !== "Completed").length,
   };
+
+  const completionRate = reportStats.total > 0 ? Math.round((reportStats.completed / reportStats.total) * 100) : 0;
+
+  const statCards = [
+    { label: "Active Districts", value: districts.length, icon: Building2, subtitle: "National coverage" },
+    { label: "Active Coordinators", value: coordinators.filter((c) => c.status === "Active").length, icon: Users, subtitle: "Field leadership" },
+    { label: "Meetings This Month", value: meetings.filter((m) => m.month === currentMonth).length, icon: Calendar, subtitle: "Scheduled in calendar" },
+    { label: "Completion Rate", value: `${completionRate}%`, icon: CheckCircle2, subtitle: "Reports submitted" },
+  ];
+
+  const upcomingMeetings = meetings
+    .filter((m) => m.meetingDate >= today)
+    .sort((a, b) => a.meetingDate.localeCompare(b.meetingDate))
+    .slice(0, 6);
+
+  const upcomingSchedules = presidentSchedules
+    .filter((s) => s.scheduleDate >= today)
+    .sort((a, b) => a.scheduleDate.localeCompare(b.scheduleDate))
+    .slice(0, 4);
+
+  const reminderItems = [
+    ...upcomingMeetings.map((m) => ({
+      id: `meeting-${m.id}`,
+      title: m.title,
+      date: m.meetingDate,
+      meta: `${m.districtIds.length} districts`,
+      type: "Meeting",
+    })),
+    ...upcomingSchedules.map((s) => ({
+      id: `schedule-${s.id}`,
+      title: s.title,
+      date: s.scheduleDate,
+      meta: s.targetName,
+      type: "Schedule",
+    })),
+  ]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 8);
+
+  const monthlyTrend = [
+    { month: "Zones", total: zones.length },
+    { month: "Districts", total: districts.length },
+    { month: "Universities", total: universities.length },
+    { month: "Madadgar", total: madadgarTeams.length },
+    { month: "Tasks", total: tasks.length },
+    { month: "Goals", total: goals.length },
+  ];
+
+  const zonePerformance = zones.map((z) => ({
+    name: z.name.length > 14 ? `${z.name.substring(0, 14)}...` : z.name,
+    districts: districts.filter((d) => d.zone === z.name).length,
+    coordinators: coordinators.filter((c) => c.zone === z.name && c.status === "Active").length,
+  }));
+
+  const taskStatusData = [
+    { name: "Pending", value: tasks.filter((t) => t.status === "Pending").length },
+    { name: "In Progress", value: tasks.filter((t) => t.status === "In Progress").length },
+    { name: "Completed", value: tasks.filter((t) => t.status === "Completed").length },
+    { name: "Delayed", value: tasks.filter((t) => t.status === "Delayed").length },
+  ].filter((d) => d.value > 0);
+
+  const activeGoals = goals.filter((g) => g.status !== "Completed").length;
+  const activeTasks = tasks.filter((t) => t.status !== "Completed").length;
 
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground tracking-tight">MSL ERP Dashboard</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">Organization performance overview</p>
+        <section className="rounded-3xl border border-[#0b6b4a]/20 bg-gradient-to-br from-[#f6fbf8] via-[#eef7f2] to-[#e4f2eb] p-6 shadow-[0_20px_60px_rgba(1,79,53,0.08)]">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#014f35]/70">Overview</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#013122]">Welcome Back, MSL Team</h1>
+              <p className="mt-1 text-sm text-[#014f35]/75">Live organizational operations, meetings and reminders in one place.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge className="gap-1 rounded-full border-0 bg-[#014f35] px-3 py-1 text-[11px] text-white">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" /> Live Data
+              </Badge>
+              <button
+                onClick={() => navigate("/meetings")}
+                className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#014f35] shadow-sm ring-1 ring-[#014f35]/20 transition hover:bg-[#014f35] hover:text-white"
+              >
+                Open Meetings <ArrowUpRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
-          <Badge variant="secondary" className="hidden sm:flex gap-1 text-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Live
-          </Badge>
-        </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-          {statCards.map((stat) => (
-            <Card key={stat.label} className="border-none shadow-sm hover:shadow-md transition-all cursor-pointer group">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className={`p-2 rounded-lg bg-${stat.color}/10`}>
-                    <stat.icon className={`h-4 w-4 text-${stat.color}`} />
+          <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {statCards.map((stat) => (
+              <Card key={stat.label} className="border border-[#d3e7dc] bg-white/85 shadow-none">
+                <CardContent className="flex items-center justify-between p-4">
+                  <div>
+                    <p className="text-xs font-medium text-[#014f35]/70">{stat.label}</p>
+                    <p className="mt-1 text-3xl font-semibold text-[#013122]">{stat.value}</p>
+                    <p className="text-[11px] text-[#014f35]/60">{stat.subtitle}</p>
                   </div>
-                  <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
-                    {stat.change}
-                  </span>
+                  <div className="rounded-xl bg-[#014f35]/10 p-2.5 text-[#014f35]">
+                    <stat.icon className="h-5 w-5" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        {/* Upcoming Meetings & President Schedule - Enhanced Styling */}
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          <Card className="border-none shadow-lg xl:col-span-2 bg-gradient-to-br from-blue-50 via-white to-cyan-50">
+            <CardHeader className="pb-3 border-b border-blue-200/30">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold text-[#013122]">
+                  <Calendar className="h-5 w-5 text-blue-600" /> Upcoming Meetings
+                </CardTitle>
+                <button onClick={() => navigate("/meetings")} className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition">View all →</button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2 pt-4">
+              {upcomingMeetings.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">No upcoming meetings.</p>}
+              {upcomingMeetings.map((meeting, idx) => (
+                <div key={meeting.id} className="flex items-center justify-between rounded-xl border border-blue-200/50 bg-gradient-to-r from-blue-50/80 to-cyan-50/80 px-4 py-3 hover:shadow-md transition-all">
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="h-2 w-2 rounded-full bg-blue-500" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-[#013122]">{meeting.title}</p>
+                      <p className="text-xs text-blue-600/70">{meeting.meetingDate} • {meeting.districtIds.length} districts</p>
+                    </div>
+                  </div>
+                  <Badge className="border-0 bg-blue-100 text-xs text-blue-700">{meeting.scope}</Badge>
                 </div>
-                <p className="text-2xl font-bold tracking-tight">{stat.value}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{stat.label}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              ))}
+            </CardContent>
+          </Card>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-          <Card className="border-none shadow-sm bg-gradient-to-r from-emerald-500 to-emerald-600 text-white cursor-pointer" onClick={() => navigate("/meetings")}>
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <p className="text-emerald-100 text-xs font-medium">Meeting Reports</p>
-                <p className="text-2xl font-bold">{reportStats.completed}/{reportStats.total}</p>
+          <Card className="border-none shadow-lg bg-gradient-to-br from-purple-50 via-white to-pink-50">
+            <CardHeader className="pb-3 border-b border-purple-200/30">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold text-[#013122]">
+                  <CalendarDays className="h-5 w-5 text-purple-600" /> President Schedule
+                </CardTitle>
+                <button onClick={() => navigate("/president-schedule")} className="text-xs font-semibold text-purple-600 hover:text-purple-800 transition">View all →</button>
               </div>
-              <ArrowUpRight className="h-5 w-5 text-emerald-200" />
-            </CardContent>
-          </Card>
-          <Card className="border-none shadow-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white cursor-pointer" onClick={() => navigate("/districts")}>
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-xs font-medium">Districts Coverage</p>
-                <p className="text-2xl font-bold">{districts.filter(d => d.currentCoordinatorId).length}/{districts.length}</p>
-              </div>
-              <ArrowUpRight className="h-5 w-5 text-blue-200" />
-            </CardContent>
-          </Card>
-          <Card className="border-none shadow-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white cursor-pointer" onClick={() => navigate("/goals")}>
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <p className="text-amber-100 text-xs font-medium">Goals Achievement</p>
-                <p className="text-2xl font-bold">{goals.length > 0 ? Math.round(goals.filter(g => g.status === "Completed").length / goals.length * 100) : 0}%</p>
-              </div>
-              <ArrowUpRight className="h-5 w-5 text-amber-200" />
-            </CardContent>
-          </Card>
-          <Card className="border-none shadow-sm bg-gradient-to-r from-violet-500 to-indigo-600 text-white cursor-pointer" onClick={() => navigate("/universities")}>
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <p className="text-violet-100 text-xs font-medium">Universities</p>
-                <p className="text-2xl font-bold">{universities.length}</p>
-              </div>
-              <ArrowUpRight className="h-5 w-5 text-violet-200" />
-            </CardContent>
-          </Card>
-          <Card className="border-none shadow-sm bg-gradient-to-r from-cyan-500 to-blue-600 text-white cursor-pointer" onClick={() => navigate("/madadgar-teams")}>
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <p className="text-cyan-100 text-xs font-medium">Madadgar Teams</p>
-                <p className="text-2xl font-bold">{madadgarTeams.length}</p>
-              </div>
-              <ArrowUpRight className="h-5 w-5 text-cyan-200" />
-            </CardContent>
-          </Card>
-          <Card className="border-none shadow-sm bg-gradient-to-r from-rose-500 to-pink-600 text-white cursor-pointer" onClick={() => navigate("/president-schedule")}>
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <p className="text-rose-100 text-xs font-medium">President Schedule</p>
-                <p className="text-2xl font-bold">{presidentSchedules.length}</p>
-              </div>
-              <ArrowUpRight className="h-5 w-5 text-rose-200" />
+            </CardHeader>
+            <CardContent className="space-y-2 pt-4">
+              {upcomingSchedules.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">No schedules.</p>}
+              {upcomingSchedules.map((schedule) => (
+                <div key={schedule.id} className="rounded-xl border border-purple-200/50 bg-gradient-to-r from-purple-50/80 to-pink-50/80 px-4 py-3 hover:shadow-md transition-all">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="h-2 w-2 rounded-full bg-purple-500" />
+                    <p className="truncate text-sm font-medium text-[#013122]">{schedule.title}</p>
+                  </div>
+                  <p className="text-xs text-purple-600/70 ml-4">{schedule.targetName}</p>
+                  <div className="mt-2 flex items-center justify-between ml-4">
+                    <p className="text-[11px] text-purple-600/80 font-medium">{schedule.scheduleDate}</p>
+                    <Badge className="text-[10px] bg-purple-100 text-purple-700 border-0">{schedule.frequency}</Badge>
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Performance Meter */}
+        <Card className="border-none shadow-lg bg-gradient-to-r from-orange-50 via-red-50 to-yellow-50">
+          <CardHeader className="pb-3 border-b border-orange-200/30">
+            <CardTitle className="text-base font-semibold text-[#013122]">📊 Performance Meter</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {/* Completion Rate Meter */}
+              <div className="text-center">
+                <p className="text-xs font-semibold text-gray-600 mb-3">Report Completion</p>
+                <div className="relative h-32 w-32 mx-auto">
+                  <svg className="transform -rotate-90" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8" />
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="50"
+                      fill="none"
+                      stroke="url(#grad1)"
+                      strokeWidth="8"
+                      strokeDasharray={`${(completionRate / 100) * 314} 314`}
+                      strokeLinecap="round"
+                    />
+                    <defs>
+                      <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#f59e0b" />
+                        <stop offset="100%" stopColor="#ec4899" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <p className="text-2xl font-bold text-[#013122]">{completionRate}%</p>
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-2">{reportStats.completed}/{reportStats.total} reports</p>
+              </div>
+
+              {/* Tasks Meter */}
+              <div className="text-center">
+                <p className="text-xs font-semibold text-gray-600 mb-3">Task Progress</p>
+                <div className="relative h-32 w-32 mx-auto">
+                  <svg className="transform -rotate-90" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8" />
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="50"
+                      fill="none"
+                      stroke="url(#grad2)"
+                      strokeWidth="8"
+                      strokeDasharray={`${tasks.length > 0 ? ((tasks.filter(t => t.status === "Completed").length / tasks.length) * 314) : 0} 314`}
+                      strokeLinecap="round"
+                    />
+                    <defs>
+                      <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#3b82f6" />
+                        <stop offset="100%" stopColor="#06b6d4" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <p className="text-2xl font-bold text-[#013122]">{tasks.length > 0 ? Math.round((tasks.filter(t => t.status === "Completed").length / tasks.length) * 100) : 0}%</p>
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-2">{tasks.filter(t => t.status === "Completed").length} completed</p>
+              </div>
+
+              {/* Goals Meter */}
+              <div className="text-center">
+                <p className="text-xs font-semibold text-gray-600 mb-3">Goals Achieved</p>
+                <div className="relative h-32 w-32 mx-auto">
+                  <svg className="transform -rotate-90" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8" />
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="50"
+                      fill="none"
+                      stroke="url(#grad3)"
+                      strokeWidth="8"
+                      strokeDasharray={`${goals.length > 0 ? ((goals.filter(g => g.status === "Completed").length / goals.length) * 314) : 0} 314`}
+                      strokeLinecap="round"
+                    />
+                    <defs>
+                      <linearGradient id="grad3" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#10b981" />
+                        <stop offset="100%" stopColor="#14b8a6" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <p className="text-2xl font-bold text-[#013122]">{goals.length > 0 ? Math.round((goals.filter(g => g.status === "Completed").length / goals.length) * 100) : 0}%</p>
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-2">{goals.filter(g => g.status === "Completed").length} completed</p>
+              </div>
+
+              {/* Overall Health Meter */}
+              <div className="text-center">
+                <p className="text-xs font-semibold text-gray-600 mb-3">Overall Health</p>
+                <div className="relative h-32 w-32 mx-auto">
+                  <svg className="transform -rotate-90" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8" />
+
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="50"
+                      fill="none"
+                      stroke="url(#grad4)"
+                      strokeWidth="8"
+                      strokeDasharray={`${((completionRate + (tasks.length > 0 ? ((tasks.filter(t => t.status === "Completed").length / tasks.length) * 100) : 0) + (goals.length > 0 ? ((goals.filter(g => g.status === "Completed").length / goals.length) * 100) : 0)) / 3 / 100) * 314} 314`}
+                      strokeLinecap="round"
+                    />
+                    <defs>
+                      <linearGradient id="grad4" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#f97316" />
+                        <stop offset="50%" stopColor="#f43f5e" />
+                        <stop offset="100%" stopColor="#a855f7" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <p className="text-2xl font-bold text-[#013122]">{Math.round((completionRate + (tasks.length > 0 ? ((tasks.filter(t => t.status === "Completed").length / tasks.length) * 100) : 0) + (goals.length > 0 ? ((goals.filter(g => g.status === "Completed").length / goals.length) * 100) : 0)) / 3)}%</p>
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-2">System Overall</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <Card className="border-none bg-white shadow-sm xl:col-span-8">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-[#013122]">Live Operations Trend</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={260}>
+                <LineChart data={monthlyTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="total" stroke="#014f35" strokeWidth={2.5} dot={{ r: 4, fill: "#014f35" }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none bg-[#0b1f18] text-white shadow-sm xl:col-span-4">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-white"><BellRing className="h-4 w-4 text-emerald-300" /> Meeting Reminders</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {reminderItems.length === 0 && <p className="rounded-lg bg-white/5 px-3 py-4 text-xs text-emerald-100/80">No upcoming reminders.</p>}
+              {reminderItems.map((item) => (
+                <div key={item.id} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-sm font-medium">{item.title}</p>
+                    <Badge variant="outline" className="border-white/20 bg-white/10 text-[10px] text-emerald-200">{item.type}</Badge>
+                  </div>
+                  <p className="mt-1 text-[11px] text-emerald-100/75">{item.meta}</p>
+                  <p className="mt-1 flex items-center gap-1 text-[11px] text-emerald-300"><Clock3 className="h-3 w-3" /> {item.date}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Card className="border-none shadow-sm">
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Zone Overview</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Zone Performance</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={zonePerformance}>
@@ -172,32 +414,13 @@ export default function Dashboard() {
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="districts" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} name="Districts" />
-                  <Bar dataKey="coordinators" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} name="Coordinators" />
+                  <Bar dataKey="districts" fill="#014f35" radius={[4, 4, 0, 0]} name="Districts" />
+                  <Bar dataKey="coordinators" fill="#27a176" radius={[4, 4, 0, 0]} name="Coordinators" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
-          <Card className="border-none shadow-sm">
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Goals vs Achievement</CardTitle></CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={goalData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-15} textAnchor="end" height={50} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="target" fill="hsl(var(--chart-3))" radius={[4, 4, 0, 0]} name="Target" />
-                  <Bar dataKey="completed" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} name="Completed" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <Card className="border-none shadow-sm">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Task Distribution</CardTitle></CardHeader>
             <CardContent>
@@ -211,56 +434,96 @@ export default function Dashboard() {
                   <Tooltip />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="flex flex-wrap justify-center gap-3 mt-1">
+              <div className="mt-2 grid grid-cols-2 gap-2">
                 {taskStatusData.map((item, i) => (
-                  <div key={item.name} className="flex items-center gap-1.5 text-xs">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i] }} />
-                    <span className="text-muted-foreground">{item.name} ({item.value})</span>
+                  <div key={item.name} className="flex items-center gap-2 rounded-lg bg-muted/40 px-2 py-1.5 text-xs">
+                    <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLORS[i] }} />
+                    <span className="text-muted-foreground">{item.name}: {item.value}</span>
                   </div>
                 ))}
               </div>
             </CardContent>
           </Card>
-
-          <Card className="border-none shadow-sm lg:col-span-2">
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Monthly Activities Trend</CardTitle></CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={monthlyTrend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="activities" stroke="hsl(var(--chart-1))" strokeWidth={2.5} dot={{ r: 4, fill: "hsl(var(--chart-1))" }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
         </div>
 
-        <Card className="border-none shadow-sm">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-semibold">Recent Tasks</CardTitle>
-              <button onClick={() => navigate("/tasks")} className="text-xs text-primary hover:underline font-medium">View All →</button>
-            </div>
+        {/* Live Operations Section */}
+        <Card className="border-none shadow-lg bg-gradient-to-r from-teal-50 via-cyan-50 to-blue-50">
+          <CardHeader className="pb-3 border-b border-teal-200/30">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold text-[#013122]">
+              <span className="h-3 w-3 rounded-full bg-teal-500 animate-pulse" /> Live Operations Status
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {tasks.slice(0, 5).map(task => (
-                <div key={task.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40 hover:bg-muted/70 transition-colors">
-                  <div>
-                    <p className="text-sm font-medium">{task.title}</p>
-                    <p className="text-xs text-muted-foreground">{task.districtName || task.zone} · Due {task.deadline}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={task.priority === "Critical" || task.priority === "High" ? "destructive" : "secondary"} className="text-[10px]">{task.priority}</Badge>
-                    <Badge variant={task.status === "Completed" ? "default" : "outline"} className="text-[10px]">{task.status}</Badge>
-                  </div>
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="rounded-xl border border-teal-200/50 bg-gradient-to-br from-teal-50 to-cyan-50 p-4">
+                <p className="text-xs font-semibold text-teal-700 mb-2">Active Districts</p>
+                <p className="text-3xl font-bold text-[#013122]">{districts.length}</p>
+                <div className="mt-3 h-2 bg-teal-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-teal-500 to-cyan-500" style={{ width: `${Math.min((districts.length / 35) * 100, 100)}%` }} />
                 </div>
-              ))}
-              {tasks.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">No tasks yet</p>}
+              </div>
+
+              <div className="rounded-xl border border-blue-200/50 bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
+                <p className="text-xs font-semibold text-blue-700 mb-2">Active Coordinators</p>
+                <p className="text-3xl font-bold text-[#013122]">{coordinators.filter((c) => c.status === "Active").length}</p>
+                <div className="mt-3 h-2 bg-blue-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500" style={{ width: `${Math.min((coordinators.filter((c) => c.status === "Active").length / coordinators.length * 100) || 0, 100)}%` }} />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-purple-200/50 bg-gradient-to-br from-purple-50 to-pink-50 p-4">
+                <p className="text-xs font-semibold text-purple-700 mb-2">Active Meetings</p>
+                <p className="text-3xl font-bold text-[#013122]">{meetings.filter((m) => m.month === currentMonth).length}</p>
+                <div className="mt-3 h-2 bg-purple-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-purple-500 to-pink-500" style={{ width: `${Math.min((meetings.filter((m) => m.month === currentMonth).length / meetings.length * 100) || 0, 100)}%` }} />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-orange-200/50 bg-gradient-to-br from-orange-50 to-red-50 p-4">
+                <p className="text-xs font-semibold text-orange-700 mb-2">Pending Actions</p>
+                <p className="text-3xl font-bold text-[#013122]">{reportStats.pending}</p>
+                <div className="mt-3 h-2 bg-orange-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-orange-500 to-red-500" style={{ width: `${Math.min((reportStats.pending / reportStats.total * 100) || 0, 100)}%` }} />
+                </div>
+              </div>
             </div>
+
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <button onClick={() => navigate("/districts")} className="rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 px-4 py-2.5 text-xs font-semibold text-white transition hover:shadow-lg">
+                → View Districts
+              </button>
+              <button onClick={() => navigate("/coordinators")} className="rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 px-4 py-2.5 text-xs font-semibold text-white transition hover:shadow-lg">
+                → View Coordinators
+              </button>
+              <button onClick={() => navigate("/meetings")} className="rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-2.5 text-xs font-semibold text-white transition hover:shadow-lg">
+                → View Meetings
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none bg-gradient-to-br from-[#014f35] to-[#013826] text-white shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-white">Quick Health Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-xl bg-white/10 px-3 py-2.5">
+                <p className="text-xs text-emerald-100/80">Pending Reports</p>
+                <p className="mt-1 text-2xl font-semibold">{reportStats.pending}</p>
+              </div>
+              <div className="rounded-xl bg-white/10 px-3 py-2.5">
+                <p className="text-xs text-emerald-100/80">Open Tasks</p>
+                <p className="mt-1 text-2xl font-semibold">{activeTasks}</p>
+              </div>
+              <div className="rounded-xl bg-white/10 px-3 py-2.5">
+                <p className="text-xs text-emerald-100/80">Active Goals</p>
+                <p className="mt-1 text-2xl font-semibold">{activeGoals}</p>
+              </div>
+            </div>
+            <button onClick={() => navigate("/analytics")} className="w-full rounded-xl bg-white px-3 py-2 text-xs font-semibold text-[#014f35] transition hover:bg-emerald-50">
+              Open Detailed Analytics
+            </button>
           </CardContent>
         </Card>
       </div>

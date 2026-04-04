@@ -1,0 +1,275 @@
+/**
+ * Firestore Security Rules for MSL ERP
+ * 
+ * IMPORTANT: Deploy these rules to your Firebase Console before going to production
+ * Path: Firebase Console > Firestore > Rules tab
+ * 
+ * These rules implement:
+ * - Role-based access control (admin, user)
+ * - Scoped queries (users can only see their assigned districts/universities)
+ * - Data integrity (merge-only, no full overwrites)
+ * - Audit trail (timestamps cannot be modified)
+ */
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ============================================================================
+    // AUTH FUNCTIONS
+    // ============================================================================
+    
+    function isLoggedIn() {
+      return request.auth.uid != null;
+    }
+    
+    function isAdmin() {
+      return get(/databases/$(database)/documents/user_roles/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isAuthorized(requiredRole) {
+      let userRoleDoc = get(/databases/$(database)/documents/user_roles/$(request.auth.uid));
+      let userRole = userRoleDoc.data.role;
+      return userRole == 'admin' || userRole == requiredRole;
+    }
+    
+    function userHasPermission(permission) {
+      return get(/databases/$(database)/documents/user_permissions/$(request.auth.uid)).data[permission] == true;
+    }
+    
+    function isAssignedToDistrict(districtId) {
+      let assignedDistricts = get(/databases/$(database)/documents/user_permissions/$(request.auth.uid)).data.assignedDistrictIds;
+      return request.auth.uid in get(/databases/$(database)/documents/users/$(request.auth.uid)).data ||
+             (isAdmin()) ||
+             (assignedDistricts.size() > 0 && districtId in assignedDistricts);
+    }
+    
+    function isAssignedToUniversity(universityId) {
+      let assignedUniversities = get(/databases/$(database)/documents/user_permissions/$(request.auth.uid)).data.assignedUniversityIds;
+      return (isAdmin()) ||
+             (assignedUniversities.size() > 0 && universityId in assignedUniversities);
+    }
+    
+    function canMergeField(field) {
+      // Cannot modify these system fields
+      let protectedFields = ['id', 'createdAt', 'createdBy'];
+      return !(field in protectedFields);
+    }
+    
+    function isValidMerge(data) {
+      // Ensure only merge operations on writable fields
+      return request.writeFields.all(field, canMergeField(field));
+    }
+    
+    // ============================================================================
+    // USERS COLLECTION
+    // ============================================================================
+    
+    match /users/{userId} {
+      allow read: if isLoggedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isLoggedIn() && request.auth.uid == userId && 
+                      request.resource.data.email == request.auth.token.email &&
+                      request.resource.data.createdAt == request.time;
+      allow update: if request.auth.uid == userId && isValidMerge(request.resource.data);
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================================================
+    // USER ROLES
+    // ============================================================================
+    
+    match /user_roles/{userId} {
+      allow read: if isLoggedIn() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
+    }
+    
+    // ============================================================================
+    // USER PERMISSIONS
+    // ============================================================================
+    
+    match /user_permissions/{userId} {
+      allow read: if isLoggedIn() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin() && isValidMerge(request.resource.data);
+    }
+    
+    // ============================================================================
+    // USER DESIGNATIONS
+    // ============================================================================
+    
+    match /user_designations/{userId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin();
+    }
+    
+    // ============================================================================
+    // GEOGRAPHIC ZONES & DISTRICTS
+    // ============================================================================
+    
+    match /zones/{zoneId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin() || userHasPermission('canAddDistrictData');
+    }
+    
+    match /districts/{districtId} {
+      allow read: if isLoggedIn();
+      allow write: if (isAdmin() || userHasPermission('canEditDistrictData')) && isValidMerge(request.resource.data);
+    }
+    
+    // ============================================================================
+    // COORDINATORS
+    // ============================================================================
+    
+    match /coordinators/{coordinatorId} {
+      allow read: if isLoggedIn();
+      allow write: if (isAdmin() || userHasPermission('canAddDistrictData')) && isValidMerge(request.resource.data);
+    }
+    
+    // ============================================================================
+    // ACTIVITIES, GOALS, & TASKS
+    // ============================================================================
+    
+    match /activities/{activityId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin();
+    }
+    
+    match /goals/{goalId} {
+      allow read: if isLoggedIn() && (
+        isAdmin() || 
+        isAssignedToDistrict(resource.data.districtId)
+      );
+      allow write: if (isAdmin() || userHasPermission('canCreateMeetings')) && isValidMerge(request.resource.data);
+    }
+    
+    match /tasks/{taskId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin() || userHasPermission('canCreateMeetings');
+    }
+    
+    // ============================================================================
+    // DISTRICT MEETINGS & RECORDS
+    // ============================================================================
+    
+    match /meetings/{meetingId} {
+      allow read: if isLoggedIn();
+      allow write: if (isAdmin() || userHasPermission('canCreateMeetings')) && isValidMerge(request.resource.data);
+    }
+    
+    match /district_meeting_records/{recordId} {
+      allow read: if isLoggedIn() && (
+        isAdmin() ||
+        isAssignedToDistrict(resource.data.districtId)
+      );
+      allow write: if (isAdmin() || userHasPermission('canCreateMeetings')) && isValidMerge(request.resource.data);
+    }
+    
+    match /meeting_districts/{docId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin() || userHasPermission('canCreateMeetings');
+    }
+    
+    // ============================================================================
+    // UNIVERSITIES
+    // ============================================================================
+    
+    match /universities/{universityId} {
+      allow read: if isLoggedIn();
+      allow create, update: if isAdmin() && isValidMerge(request.resource.data);
+      allow delete: if isAdmin();
+    }
+    
+    match /university_coordinators/{coordinatorId} {
+      allow read: if isLoggedIn();
+      allow write: if (isAdmin() || userHasPermission('canManageUniversityRecords')) && isValidMerge(request.resource.data);
+    }
+    
+    match /university_goals/{goalId} {
+      allow read: if isLoggedIn() && (
+        isAdmin() ||
+        isAssignedToUniversity(resource.data.universityId)
+      );
+      allow write: if (isAdmin() || userHasPermission('canCreateUniversityMeetings')) && isValidMerge(request.resource.data);
+    }
+    
+    match /university_scenarios/{scenarioId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin();
+    }
+    
+    match /university_tasks/{taskId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin() || userHasPermission('canCreateUniversityMeetings');
+    }
+    
+    // ============================================================================
+    // UNIVERSITY MEETINGS
+    // ============================================================================
+    
+    match /university_meetings/{meetingId} {
+      allow read: if isLoggedIn();
+      allow write: if (isAdmin() || userHasPermission('canCreateUniversityMeetings')) && isValidMerge(request.resource.data);
+    }
+    
+    match /university_meeting_records/{recordId} {
+      allow read: if isLoggedIn() && (
+        isAdmin() ||
+        isAssignedToUniversity(resource.data.universityId)
+      );
+      allow write: if (isAdmin() || userHasPermission('canManageUniversityRecords')) && isValidMerge(request.resource.data);
+    }
+    
+    // ============================================================================
+    // MADADGAR TEAMS
+    // ============================================================================
+    
+    match /madadgar_teams/{teamId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin() && isValidMerge(request.resource.data);
+    }
+    
+    match /madadgar_coordinators/{coordinatorId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin() && isValidMerge(request.resource.data);
+    }
+    
+    match /madadgar_goals/{goalId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin() && isValidMerge(request.resource.data);
+    }
+    
+    match /madadgar_tasks/{taskId} {
+      allow read: if isLoggedIn();
+      allow write: if (isAdmin() || userHasPermission('canCreateMeetings')) && isValidMerge(request.resource.data);
+    }
+    
+    match /madadgar_meetings/{meetingId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin() && isValidMerge(request.resource.data);
+    }
+    
+    // ============================================================================
+    // MARKAZI TEAM PROFILES
+    // ============================================================================
+    
+    match /markazi_team_profiles/{profileId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin() && isValidMerge(request.resource.data);
+    }
+    
+    // ============================================================================
+    // PRESIDENT SCHEDULES
+    // ============================================================================
+    
+    match /president_schedules/{scheduleId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin() && isValidMerge(request.resource.data);
+    }
+    
+    // ============================================================================
+    // CATCH-ALL (DENY BY DEFAULT)
+    // ============================================================================
+    
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

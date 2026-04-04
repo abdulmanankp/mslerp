@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 // ...existing code...
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/useAuth";
@@ -25,16 +25,18 @@ function LoginForm() {
     setCaptcha(code);
   };
 
-  useState(() => {
+  useEffect(() => {
     generateCaptcha();
-  });
-  const { signIn } = useAuth();
+  }, []);
+
+  const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -54,14 +56,23 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const { error } = await signIn(email, password);
+      const { error } = isSignUpMode
+        ? await signUp(email, password)
+        : await signIn(email, password);
+
       if (error) {
         toast({
-          title: "Login Failed",
+          title: isSignUpMode ? "Sign Up Failed" : "Login Failed",
           description: error.message,
           variant: "destructive",
         });
       } else {
+        toast({
+          title: isSignUpMode ? "Account created" : "Login successful",
+          description: isSignUpMode
+            ? "Your account has been created."
+            : "Welcome back.",
+        });
         navigate("/", { replace: true });
       }
     } catch {
@@ -88,14 +99,18 @@ function LoginForm() {
           <div>
             <h1 className="text-2xl font-bold">MSL Pakistan ERP Portal</h1>
             <p className="text-sm text-muted-foreground">
-              Sign in to access your management dashboard
+              {isSignUpMode
+                ? "Create your account to access management dashboard"
+                : "Sign in to access your management dashboard"}
             </p>
           </div>
         </div>
 
         <Card className="border shadow-lg">
           <CardHeader>
-            <h2 className="text-lg font-semibold">Sign In</h2>
+            <h2 className="text-lg font-semibold">
+              {isSignUpMode ? "Sign Up" : "Sign In"}
+            </h2>
           </CardHeader>
 
           <CardContent>
@@ -159,7 +174,24 @@ function LoginForm() {
                 disabled={loading}
               >
                 <LogIn size={16}/>
-                {loading ? "Signing in..." : "Sign In"}
+                {loading
+                  ? isSignUpMode
+                    ? "Creating account..."
+                    : "Signing in..."
+                  : isSignUpMode
+                    ? "Create Account"
+                    : "Sign In"}
+              </Button>
+
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={() => setIsSignUpMode((v) => !v)}
+              >
+                {isSignUpMode
+                  ? "Already have an account? Sign In"
+                  : "New user? Create an account"}
               </Button>
 
             </form>

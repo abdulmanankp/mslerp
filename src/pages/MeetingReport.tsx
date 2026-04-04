@@ -4,25 +4,30 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useDistrictMeetingRecords, useDistricts, useMeetings, useActivities, useGoals, LoadingSkeleton } from "@/hooks/useSupabaseData";
+import { useDistrictMeetingRecords, useDistricts, useMeetings, useActivities, useGoals, useUpdateDistrictMeetingRecord, LoadingSkeleton } from "@/hooks/useFirebaseData";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, FileText, Plus, Download, Save, Pencil, X, ListTodo, MessageSquare, ClipboardList, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
-import type { ActivityReport, CustomActivity, NextMonthTask } from "@/types";
+import type { ActivityReport, CustomActivity, DistrictMediaReport, MeetingAttendee, NextMonthTask } from "@/types";
 import { exportDistrictReportPDF, exportDistrictReportExcel } from "@/lib/exportUtils";
+import { useToast } from "@/hooks/use-toast";
 
 export default function MeetingReport() {
   const { meetingId, districtId } = useParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const { data: dmRecords = [], isLoading: rL } = useDistrictMeetingRecords(meetingId);
   const { data: districts = [], isLoading: dL } = useDistricts();
   const { data: meetings = [], isLoading: mL } = useMeetings();
   const { data: activitiesList = [], isLoading: aL } = useActivities();
   const { data: goals = [] } = useGoals();
+  const updateDistrictMeetingRecord = useUpdateDistrictMeetingRecord();
 
   const record = dmRecords.find(r => r.meetingId === meetingId && r.districtId === districtId);
   const district = districts.find(d => d.id === districtId);
@@ -35,6 +40,17 @@ export default function MeetingReport() {
   const [nextMonthTasks, setNextMonthTasks] = useState<NextMonthTask[]>([]);
   const [notes, setNotes] = useState("");
   const [attendance, setAttendance] = useState("");
+  const [attendanceCount, setAttendanceCount] = useState(0);
+  const [attendees, setAttendees] = useState<MeetingAttendee[]>([]);
+  const [mediaReport, setMediaReport] = useState<DistrictMediaReport>({
+    contentProduction: 0,
+    reels: 0,
+    mediaPosting: 0,
+    hasFacebookPage: false,
+    facebookFollowers: 0,
+    postingFrequency: "Weekly",
+  });
+  const [includeMediaReport, setIncludeMediaReport] = useState(false);
 
   useEffect(() => {
     if (record) {
@@ -43,6 +59,18 @@ export default function MeetingReport() {
       setNextMonthTasks(record.nextMonthTasks || []);
       setNotes(record.notes || "");
       setAttendance(record.attendance || "");
+      setAttendanceCount(record.attendanceCount || 0);
+      setAttendees(record.attendees || []);
+      const hasMedia = !!record.mediaReport;
+      setIncludeMediaReport(hasMedia);
+      setMediaReport(record.mediaReport || {
+        contentProduction: 0,
+        reels: 0,
+        mediaPosting: 0,
+        hasFacebookPage: false,
+        facebookFollowers: 0,
+        postingFrequency: "Weekly",
+      });
     }
   }, [record]);
 
@@ -74,6 +102,53 @@ export default function MeetingReport() {
   };
   const handleDeleteTask = (index: number) => setNextMonthTasks(prev => prev.filter((_, i) => i !== index));
   const handleAddTask = () => setNextMonthTasks(prev => [...prev, { id: `nmt_new_${Date.now()}`, taskName: "", activityType: "", targetQuantity: 0, deadline: "", notes: "" }]);
+  const handleAttendanceCountChange = (raw: string) => {
+    const count = Math.max(0, parseInt(raw, 10) || 0);
+    setAttendanceCount(count);
+    setAttendees((prev) => {
+      const base = prev.slice(0, count);
+      while (base.length < count) {
+        base.push({ id: `att_${Date.now()}_${base.length}`, name: "", designation: "" });
+      }
+      return base;
+    });
+  };
+  const handleUpdateAttendee = (index: number, field: keyof MeetingAttendee, value: string) => {
+    setAttendees((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  };
+  const updateMediaMetric = (field: keyof DistrictMediaReport, raw: string) => {
+    const value = Math.max(0, parseInt(raw, 10) || 0);
+    setMediaReport((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveReport = async () => {
+    if (!record?.id) {
+      toast({ title: "Record not found", description: "Unable to save this report.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      await updateDistrictMeetingRecord.mutateAsync({
+        id: record.id,
+        status: "Completed",
+        notes,
+        attendance: attendance as "Present" | "Absent" | "Late" | undefined,
+        attendanceCount,
+        attendees,
+        mediaReport: includeMediaReport ? mediaReport : null,
+        activityReports,
+        customActivities,
+        nextMonthTasks,
+        updatedAt: new Date().toISOString(),
+      });
+
+      setEditing(false);
+      toast({ title: "Saved", description: "Meeting report saved to Firebase." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save report.";
+      toast({ title: "Save failed", description: message, variant: "destructive" });
+    }
+  };
 
   return (
     <AppLayout>
@@ -102,7 +177,7 @@ export default function MeetingReport() {
                 <DropdownMenuItem onClick={() => record && exportDistrictReportExcel(record, districts)}><FileText className="h-3.5 w-3.5 mr-2" /> Export as Excel</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button size="sm" className="gap-1.5 text-xs"><Save className="h-3.5 w-3.5" /> Save</Button>
+            <Button size="sm" className="gap-1.5 text-xs" onClick={handleSaveReport} disabled={updateDistrictMeetingRecord.isPending}><Save className="h-3.5 w-3.5" /> {updateDistrictMeetingRecord.isPending ? "Saving..." : "Save"}</Button>
           </div>
         </div>
 
@@ -190,6 +265,104 @@ export default function MeetingReport() {
         </Card>
 
         <Card className="border-none shadow-sm">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="text-sm">Media Department Report (Optional)</CardTitle>
+              {isEditable && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Add media report</span>
+                  <Switch checked={includeMediaReport} onCheckedChange={setIncludeMediaReport} />
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isEditable ? (
+              includeMediaReport ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Content Production</Label>
+                  <Input type="number" min={0} value={mediaReport.contentProduction} onChange={(e) => updateMediaMetric("contentProduction", e.target.value)} placeholder="0" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Reels</Label>
+                  <Input type="number" min={0} value={mediaReport.reels} onChange={(e) => updateMediaMetric("reels", e.target.value)} placeholder="0" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Media Posting</Label>
+                  <Input type="number" min={0} value={mediaReport.mediaPosting} onChange={(e) => updateMediaMetric("mediaPosting", e.target.value)} placeholder="0" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Facebook Page Available</Label>
+                  <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
+                    <Switch
+                      checked={mediaReport.hasFacebookPage}
+                      onCheckedChange={(checked) => {
+                        setMediaReport((prev) => ({
+                          ...prev,
+                          hasFacebookPage: checked,
+                          facebookFollowers: checked ? prev.facebookFollowers : 0,
+                        }));
+                      }}
+                    />
+                    <span className="text-sm text-muted-foreground">{mediaReport.hasFacebookPage ? "Yes" : "No"}</span>
+                  </div>
+                </div>
+
+                {mediaReport.hasFacebookPage && (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Facebook Followers</Label>
+                      <Input type="number" min={0} value={mediaReport.facebookFollowers} onChange={(e) => updateMediaMetric("facebookFollowers", e.target.value)} placeholder="0" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Posting Frequency</Label>
+                      <Select
+                        value={mediaReport.postingFrequency}
+                        onValueChange={(value) => setMediaReport((prev) => ({
+                          ...prev,
+                          postingFrequency: value as DistrictMediaReport["postingFrequency"],
+                        }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select frequency" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Daily">Daily</SelectItem>
+                          <SelectItem value="Weekly">Weekly</SelectItem>
+                          <SelectItem value="Monthly">Monthly</SelectItem>
+                          <SelectItem value="Rarely">Rarely</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+              </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Media report is optional. Enable the switch to add media metrics.</p>
+              )
+            ) : (
+              includeMediaReport ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-sm">Content: <span className="font-semibold">{mediaReport.contentProduction || 0}</span></div>
+                  <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-sm">Reels: <span className="font-semibold">{mediaReport.reels || 0}</span></div>
+                  <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-sm">Posts: <span className="font-semibold">{mediaReport.mediaPosting || 0}</span></div>
+                  <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-sm">Facebook Page: <span className="font-semibold">{mediaReport.hasFacebookPage ? "Yes" : "No"}</span></div>
+                  {mediaReport.hasFacebookPage && (
+                    <>
+                      <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-sm">Followers: <span className="font-semibold">{mediaReport.facebookFollowers || 0}</span></div>
+                      <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-sm">Frequency: <span className="font-semibold">{mediaReport.postingFrequency}</span></div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No media report added.</p>
+              )
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-sm">
           <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><MessageSquare className="h-4 w-4" /> Notes & Comments</CardTitle></CardHeader>
           <CardContent>
             {isEditable ? <Textarea placeholder="Enter meeting notes, challenges faced, achievements, support needed..." rows={4} value={notes} onChange={e => setNotes(e.target.value)} /> : <p className="text-sm text-muted-foreground whitespace-pre-wrap">{notes || "No notes added."}</p>}
@@ -233,14 +406,68 @@ export default function MeetingReport() {
 
         <Card className="border-none shadow-sm">
           <CardHeader className="pb-2"><CardTitle className="text-sm">Attendance</CardTitle></CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             {isEditable ? (
-              <Select value={attendance} onValueChange={setAttendance}>
-                <SelectTrigger className="w-[160px]"><SelectValue placeholder="Select attendance" /></SelectTrigger>
-                <SelectContent><SelectItem value="Present">Present</SelectItem><SelectItem value="Absent">Absent</SelectItem><SelectItem value="Late">Late</SelectItem></SelectContent>
-              </Select>
+              <>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground">Attendance Status</p>
+                    <Select value={attendance} onValueChange={setAttendance}>
+                      <SelectTrigger className="w-[170px]"><SelectValue placeholder="Select attendance" /></SelectTrigger>
+                      <SelectContent><SelectItem value="Present">Present</SelectItem><SelectItem value="Absent">Absent</SelectItem><SelectItem value="Late">Late</SelectItem></SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground">Attendees Count</p>
+                    <Input
+                      type="number"
+                      min={0}
+                      className="w-[170px]"
+                      value={attendanceCount}
+                      onChange={(e) => handleAttendanceCountChange(e.target.value)}
+                      placeholder="e.g. 5"
+                    />
+                  </div>
+                </div>
+
+                {attendanceCount > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Attendees (Optional Name and Designation)</p>
+                    <div className="space-y-2">
+                      {attendees.map((person, index) => (
+                        <div key={person.id} className="grid grid-cols-1 gap-2 md:grid-cols-2 rounded-lg border border-border/60 bg-muted/20 p-2.5">
+                          <Input
+                            value={person.name || ""}
+                            onChange={(e) => handleUpdateAttendee(index, "name", e.target.value)}
+                            placeholder={`Attendee ${index + 1} name (optional)`}
+                          />
+                          <Input
+                            value={person.designation || ""}
+                            onChange={(e) => handleUpdateAttendee(index, "designation", e.target.value)}
+                            placeholder="Designation (e.g. Media Coordinator)"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
-              <Badge variant={attendance === "Present" ? "default" : attendance === "Late" ? "secondary" : "destructive"}>{attendance || "Not Recorded"}</Badge>
+              <div className="space-y-3">
+                <Badge variant={attendance === "Present" ? "default" : attendance === "Late" ? "secondary" : "destructive"}>{attendance || "Not Recorded"}</Badge>
+                <p className="text-sm text-muted-foreground">Attendees Count: {attendanceCount || 0}</p>
+                {(attendees || []).length > 0 && (
+                  <div className="space-y-1.5">
+                    {attendees.map((person, index) => (
+                      <p key={person.id} className="text-sm text-muted-foreground">
+                        {index + 1}. {person.name?.trim() || "Unnamed attendee"}
+                        {person.designation?.trim() ? ` - ${person.designation}` : ""}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>

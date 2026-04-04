@@ -1,0 +1,28 @@
+{
+    "meeting":  {
+                    "value":  [
+                                  {
+                                      "id":  "22a7c6db-aa9d-48a2-8c05-a852a7ac0462",
+                                      "title":  "Offline Test Meeting",
+                                      "month":  "2026-04",
+                                      "meeting_date":  "2026-04-04",
+                                      "agenda":  "Testing create meeting post flow",
+                                      "notes":  "Created via authenticated API test",
+                                      "scope":  "Selected",
+                                      "scope_value":  null,
+                                      "created_at":  "2026-04-03T21:41:38.559787+00:00"
+                                  }
+                              ],
+                    "Count":  1
+                },
+    "district":  {
+                     "value":  [
+                                   {
+                                       "id":  "8c44f7f7-fdfa-46c0-9115-70ee2d4f110f",
+                                       "name":  "Abbottabad"
+                                   }
+                               ],
+                     "Count":  1
+                 },
+    "link":  null
+}

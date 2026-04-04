@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useMeetings, useDistrictMeetingRecords, useDistricts, useZones, LoadingSkeleton } from "@/hooks/useSupabaseData";
+import { useMeetings, useDistrictMeetingRecords, useDistricts, useZones, LoadingSkeleton } from "@/hooks/useFirebaseData";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Download, Search, FileText, Eye, Plus } from "lucide-react";
 import { useState } from "react";

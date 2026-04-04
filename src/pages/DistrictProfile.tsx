@@ -9,11 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useDistricts, useCoordinators, useDistrictMeetingRecords, useGoals, useTasks, useMeetings, useActivities, LoadingSkeleton } from "@/hooks/useSupabaseData";
+import { useDistricts, useCoordinators, useDistrictMeetingRecords, useGoals, useTasks, useMeetings, useActivities, useCreateMeeting, useZones, useUpdateDistrict, LoadingSkeleton } from "@/hooks/useFirebaseData";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, User, Calendar, Target, ClipboardList, FileText, Plus, Download, Eye, History } from "lucide-react";
+import { ArrowLeft, User, Calendar, Target, ClipboardList, FileText, Plus, Download, Eye, History, Edit } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import type { ZoneName } from "@/types";
 
 export default function DistrictProfile() {
   const { id } = useParams();
@@ -22,13 +24,19 @@ export default function DistrictProfile() {
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState("all");
   const [createMeetingOpen, setCreateMeetingOpen] = useState(false);
+  const [editZoneOpen, setEditZoneOpen] = useState(false);
+  const [selectedZone, setSelectedZone] = useState("");
   const [meetingTitle, setMeetingTitle] = useState("");
   const [meetingMonth, setMeetingMonth] = useState("");
   const [meetingDate, setMeetingDate] = useState("");
   const [meetingAgenda, setMeetingAgenda] = useState("");
   const [meetingNotes, setMeetingNotes] = useState("");
+  const createMeeting = useCreateMeeting();
+  const updateDistrict = useUpdateDistrict();
+  const { toast } = useToast();
 
   const { data: districts = [], isLoading: dL } = useDistricts();
+  const { data: zones = [], isLoading: zL } = useZones();
   const { data: coordinators = [], isLoading: cL } = useCoordinators();
   const { data: dmRecords = [], isLoading: rL } = useDistrictMeetingRecords();
   const { data: goals = [], isLoading: gL } = useGoals();
@@ -36,7 +44,7 @@ export default function DistrictProfile() {
   const { data: meetings = [], isLoading: mL } = useMeetings();
   const { data: activities = [] } = useActivities();
 
-  if (dL || cL || rL || gL || tL || mL) return <AppLayout><LoadingSkeleton /></AppLayout>;
+  if (dL || zL || cL || rL || gL || tL || mL) return <AppLayout><LoadingSkeleton /></AppLayout>;
 
   const district = districts.find(d => d.id === id);
   if (!district) {
@@ -67,6 +75,54 @@ export default function DistrictProfile() {
   const filteredRecords = selectedMonth === "all" ? districtRecords : districtRecords.filter(r => r.month === selectedMonth);
   const filteredGoals = selectedMonth === "all" ? districtGoals : districtGoals.filter(g => g.month === selectedMonth);
 
+  const handleCreateDistrictMeeting = async () => {
+    if (!meetingTitle || !meetingMonth || !meetingDate) {
+      toast({ title: "Missing fields", description: "Title, month and meeting date are required.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      await createMeeting.mutateAsync({
+        title: meetingTitle,
+        month: meetingMonth,
+        meetingDate,
+        agenda: meetingAgenda,
+        notes: meetingNotes,
+        scope: "Selected",
+        districtIds: [district.id],
+      });
+      toast({ title: "Meeting created", description: `Meeting created for ${district.name}.` });
+      setCreateMeetingOpen(false);
+      setMeetingTitle("");
+      setMeetingMonth("");
+      setMeetingDate("");
+      setMeetingAgenda("");
+      setMeetingNotes("");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to create meeting.";
+      toast({ title: "Error", description: message, variant: "destructive" });
+    }
+  };
+
+  const handleUpdateZone = async () => {
+    if (!selectedZone || selectedZone === district.zone) {
+      toast({ title: "No changes", description: "Please select a different zone.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      await updateDistrict.mutateAsync({
+        districtId: district.id!,
+        updates: { zone: selectedZone as ZoneName },
+      });
+      toast({ title: "Zone updated", description: `Zone changed to ${selectedZone}.` });
+      setEditZoneOpen(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update zone.";
+      toast({ title: "Error", description: message, variant: "destructive" });
+    }
+  };
+
   return (
     <AppLayout>
       <div className="space-y-5">
@@ -89,18 +145,67 @@ export default function DistrictProfile() {
                         <div className="space-y-2"><Label>Agenda</Label><Textarea value={meetingAgenda} onChange={e => setMeetingAgenda(e.target.value)} placeholder="Meeting agenda..." rows={3} /></div>
                         <div className="space-y-2"><Label>Notes (Optional)</Label><Textarea value={meetingNotes} onChange={e => setMeetingNotes(e.target.value)} placeholder="Additional notes..." rows={2} /></div>
                         <div className="space-y-2"><Label>District</Label><Input value={district.name} disabled /></div>
-                        <Button className="w-full" onClick={() => setCreateMeetingOpen(false)}>Create Meeting</Button>
+                        <Button className="w-full" disabled={createMeeting.isPending} onClick={handleCreateDistrictMeeting}>{createMeeting.isPending ? "Creating..." : "Create Meeting"}</Button>
                       </div>
                     </DialogContent>
                   </Dialog>
                 </div>
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/districts")} className="shrink-0"><ArrowLeft className="h-4 w-4" /></Button>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold tracking-tight">{district.name}</h1>
-            <p className="text-muted-foreground text-sm">{district.zone} · {district.division} Division</p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 flex-1">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/districts")} className="shrink-0"><ArrowLeft className="h-4 w-4" /></Button>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">{district.name}</h1>
+              <p className="text-muted-foreground text-sm">{district.zone} · {district.division} Division</p>
+            </div>
           </div>
-          <Badge variant={district.status === "Active" ? "default" : "secondary"} className="text-xs">{district.status}</Badge>
+          <div className="flex items-center gap-2">
+            <Dialog open={editZoneOpen} onOpenChange={setEditZoneOpen}>
+              <DialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-1.5 text-xs"
+                  onClick={() => setSelectedZone(district.zone)}
+                >
+                  <Edit className="h-3 w-3" /> Change Zone
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Change District Zone</DialogTitle>
+                  <DialogDescription>Update {district.name} to a different zone.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 pt-2">
+                  <div className="space-y-2">
+                    <Label className="text-xs">New Zone</Label>
+                    <Select value={selectedZone} onValueChange={setSelectedZone}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a zone..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {zones.map(zone => (
+                          <SelectItem key={zone.id} value={zone.name}>
+                            {zone.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="bg-muted/50 p-3 rounded text-xs text-muted-foreground">
+                    <p><strong>Current Zone:</strong> {district.zone}</p>
+                    <p className="mt-1"><strong>New Zone:</strong> {selectedZone || "—"}</p>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" size="sm" onClick={() => setEditZoneOpen(false)}>Cancel</Button>
+                    <Button size="sm" onClick={handleUpdateZone} disabled={updateDistrict.isPending || !selectedZone || selectedZone === district.zone}>
+                      {updateDistrict.isPending ? "Updating..." : "Update Zone"}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Badge variant={district.status === "Active" ? "default" : "secondary"} className="text-xs shrink-0">{district.status}</Badge>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">

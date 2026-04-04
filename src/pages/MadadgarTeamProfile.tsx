@@ -16,7 +16,7 @@ import {
   useMadadgarMeetings,
   useCreateMadadgarMeeting,
   LoadingSkeleton,
-} from "@/hooks/useSupabaseData";
+} from "@/hooks/useFirebaseData";
 import { ArrowLeft, Calendar, ClipboardList, Plus, Target, Users } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useState } from "react";
