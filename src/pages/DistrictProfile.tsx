@@ -56,6 +56,7 @@ export default function DistrictProfile() {
   const districtRecords = dmRecords.filter(r => r.districtId === id);
   const districtGoals = goals.filter(g => g.districtId === id);
   const districtTasks = tasks.filter(t => t.districtId === id);
+  const districtVision12KTotal = districtRecords.reduce((sum, record) => sum + (record.vision12KCount || 0), 0);
 
   const allMeetingsForDistrict = meetings
     .filter(m => m.districtIds.includes(id!))
@@ -208,11 +209,12 @@ export default function DistrictProfile() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
           <Card className="border-none shadow-sm"><CardContent className="p-3"><p className="text-[10px] text-muted-foreground uppercase tracking-wide">Population</p><p className="text-lg font-bold font-mono">{district.population?.toLocaleString() || "—"}</p></CardContent></Card>
           <Card className="border-none shadow-sm"><CardContent className="p-3"><p className="text-[10px] text-muted-foreground uppercase tracking-wide">Coordinator</p><p className="text-sm font-bold truncate">{currentCoord?.name || "Unassigned"}</p></CardContent></Card>
           <Card className="border-none shadow-sm"><CardContent className="p-3"><p className="text-[10px] text-muted-foreground uppercase tracking-wide">Meetings</p><p className="text-lg font-bold">{allMeetingsForDistrict.length}</p></CardContent></Card>
           <Card className="border-none shadow-sm"><CardContent className="p-3"><p className="text-[10px] text-muted-foreground uppercase tracking-wide">Activities Done</p><p className="text-lg font-bold">{totalActivities}</p></CardContent></Card>
+          <Card className="border-none shadow-sm"><CardContent className="p-3"><p className="text-[10px] text-muted-foreground uppercase tracking-wide">Vision 12K</p><p className="text-lg font-bold">{districtVision12KTotal}</p></CardContent></Card>
           <Card className="border-none shadow-sm"><CardContent className="p-3"><p className="text-[10px] text-muted-foreground uppercase tracking-wide">Active Goals</p><p className="text-lg font-bold">{districtGoals.filter(g => g.status === "Pending").length}</p></CardContent></Card>
         </div>
 
@@ -261,19 +263,20 @@ export default function DistrictProfile() {
             </div>
             <Card className="border-none shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm">Activity Reports by Month</CardTitle></CardHeader><CardContent className="p-0">
               <Table>
-                <TableHeader><TableRow><TableHead>Month</TableHead><TableHead>Meeting</TableHead><TableHead>Activities Done</TableHead><TableHead>Attendance</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Month</TableHead><TableHead>Meeting</TableHead><TableHead>Activities Done</TableHead><TableHead>Vision 12K</TableHead><TableHead>Attendance</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {filteredRecords.map(record => (
                     <TableRow key={record.id}>
                       <TableCell className="font-medium text-sm">{record.month}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{record.meetingTitle}</TableCell>
                       <TableCell className="font-mono text-sm">{record.activityReports.reduce((s, ar) => s + ar.completedQuantity, 0)}</TableCell>
+                      <TableCell className="font-mono text-sm">{record.vision12KCount || 0}</TableCell>
                       <TableCell>{record.attendance ? <Badge variant={record.attendance === "Present" ? "default" : "secondary"} className="text-[10px]">{record.attendance}</Badge> : "—"}</TableCell>
                       <TableCell><Badge variant={record.status === "Completed" ? "default" : "outline"} className="text-[10px]">{record.status}</Badge></TableCell>
                       <TableCell className="text-right"><Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate(`/meetings/${record.meetingId}/report/${district.id}`)}><Eye className="h-3 w-3" /> View</Button></TableCell>
                     </TableRow>
                   ))}
-                  {filteredRecords.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8 text-sm">No records</TableCell></TableRow>}
+                  {filteredRecords.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8 text-sm">No records</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </CardContent></Card>

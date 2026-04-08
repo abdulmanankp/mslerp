@@ -8,6 +8,9 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { startOfflineSync } from "@/lib/offlineSync";
+import { syncMobileReminders } from "@/lib/mobileReminders";
+import { useTasks, usePresidentSchedules } from "@/hooks/useFirebaseData";
+import { useAuth } from "@/contexts/useAuth";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Zones from "./pages/Zones";
@@ -26,6 +29,7 @@ import MeetingReport from "./pages/MeetingReport";
 import UniversityMeetingReport from "./pages/UniversityMeetingReport";
 import Tasks from "./pages/Tasks";
 import Analytics from "./pages/Analytics";
+import Vision12K from "./pages/Vision12K";
 import UniversityAnalytics from "./pages/UniversityAnalytics";
 import Settings from "./pages/Settings";
 import Users from "./pages/Users";
@@ -96,6 +100,7 @@ const App = () => {
           <Sonner />
           <BrowserRouter>
             <AuthProvider>
+              <MobileReminderSync />
               <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
@@ -117,6 +122,7 @@ const App = () => {
               <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
               <Route path="/president-schedule" element={<ProtectedRoute><PresidentSchedule /></ProtectedRoute>} />
               <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+              <Route path="/vision12k" element={<ProtectedRoute><Vision12K /></ProtectedRoute>} />
               <Route path="/university-analytics" element={<ProtectedRoute requiredPermission="canMonitorUniversityAnalytics"><UniversityAnalytics /></ProtectedRoute>} />
               <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
@@ -129,5 +135,18 @@ const App = () => {
     </ErrorBoundary>
   );
 };
+
+function MobileReminderSync() {
+  const { user } = useAuth();
+  const { data: tasks = [] } = useTasks({ enabled: !!user });
+  const { data: schedules = [] } = usePresidentSchedules({ enabled: !!user });
+
+  useEffect(() => {
+    if (!user) return;
+    void syncMobileReminders(tasks, schedules);
+  }, [user, tasks, schedules]);
+
+  return null;
+}
 
 export default App;

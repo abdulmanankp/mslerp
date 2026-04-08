@@ -637,6 +637,7 @@ export function useCreateMeeting() {
           customActivities: [],
           nextMonthTasks: [],
           attendanceCount: 0,
+          vision12KCount: 0,
           attendees: [],
         };
         return districtRecord;
@@ -666,6 +667,7 @@ export function useCreateMeeting() {
               customActivities: record.customActivities,
               nextMonthTasks: record.nextMonthTasks,
               attendanceCount: record.attendanceCount,
+              vision12KCount: record.vision12KCount,
               attendees: record.attendees,
             });
           }
@@ -700,6 +702,7 @@ export function useCreateMeeting() {
               customActivities: record.customActivities,
               nextMonthTasks: record.nextMonthTasks,
               attendanceCount: record.attendanceCount,
+              vision12KCount: record.vision12KCount,
               attendees: record.attendees,
             });
           }
@@ -734,6 +737,7 @@ export function useCreateMeeting() {
               customActivities: record.customActivities,
               nextMonthTasks: record.nextMonthTasks,
               attendanceCount: record.attendanceCount,
+              vision12KCount: record.vision12KCount,
               attendees: record.attendees,
             },
           });
@@ -773,10 +777,11 @@ export function useCreateMeeting() {
 }
 
 // Tasks
-export function useTasks() {
+export function useTasks(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["tasks"],
     queryFn: async () => readCollection<Task>("tasks", "deadline"),
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -894,6 +899,7 @@ export function useDistrictMeetingRecords(meetingId?: string) {
             customActivities: Array.isArray(row.customActivities) ? row.customActivities : [],
             nextMonthTasks: Array.isArray(row.nextMonthTasks) ? row.nextMonthTasks : [],
             attendanceCount: typeof row.attendanceCount === "number" ? row.attendanceCount : 0,
+            vision12KCount: typeof row.vision12KCount === "number" ? row.vision12KCount : 0,
             attendees: Array.isArray(row.attendees) ? row.attendees : [],
             mediaReport: row.mediaReport && typeof row.mediaReport === "object"
               ? {
@@ -931,6 +937,7 @@ export function useUpdateDistrictMeetingRecord() {
       notes: string;
       attendance?: "Present" | "Absent" | "Late";
       attendanceCount: number;
+      vision12KCount: number;
       attendees: DistrictMeetingRecord["attendees"];
       mediaReport?: DistrictMeetingRecord["mediaReport"] | null;
       activityReports: DistrictMeetingRecord["activityReports"];
@@ -1463,10 +1470,11 @@ export function useCreateMadadgarMeeting() {
 }
 
 // President Schedules
-export function usePresidentSchedules() {
+export function usePresidentSchedules(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["president_schedules"],
     queryFn: async () => readCollection<PresidentSchedule>("president_schedules", "scheduleDate"),
+    enabled: options?.enabled ?? true,
   });
 }
 

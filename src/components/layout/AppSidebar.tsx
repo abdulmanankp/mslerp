@@ -39,6 +39,7 @@ const navItems = [
   { to: "/meetings", icon: Calendar, label: "Meetings" },
   { to: "/tasks", icon: ClipboardList, label: "Tasks" },
   { to: "/president-schedule", icon: CalendarDays, label: "President Schedule" },
+  { to: "/vision12k", icon: UsersRound, label: "Vision 12K" },
   { to: "/analytics", icon: BarChart3, label: "Analytics" },
   { to: "/university-analytics", icon: BarChart3, label: "University Analytics" },
   { to: "/settings", icon: Settings, label: "Settings" },

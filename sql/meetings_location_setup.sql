@@ -49,8 +49,12 @@ create table if not exists public.district_meeting_records (
   status text not null default 'Empty' check (status in ('Empty', 'Completed')),
   notes text,
   attendance text check (attendance in ('Present', 'Absent', 'Late')),
+  vision12k_count integer not null default 0,
   unique (meeting_id, district_id)
 );
+
+alter table public.district_meeting_records
+  add column if not exists vision12k_count integer not null default 0;
 
 create index if not exists idx_districts_zone on public.districts(zone);
 create index if not exists idx_meeting_districts_district_id on public.meeting_districts(district_id);
@@ -69,7 +73,8 @@ begin
     meeting_title,
     month,
     meeting_date,
-    status
+    status,
+    vision12k_count
   )
   select
     new.meeting_id,
@@ -78,7 +83,8 @@ begin
     m.title,
     m.month,
     m.meeting_date,
-    'Empty'
+    'Empty',
+    0
   from public.districts d
   join public.meetings m on m.id = new.meeting_id
   where d.id = new.district_id
@@ -86,7 +92,8 @@ begin
     set district_name = excluded.district_name,
         meeting_title = excluded.meeting_title,
         month = excluded.month,
-        meeting_date = excluded.meeting_date;
+        meeting_date = excluded.meeting_date,
+        vision12k_count = excluded.vision12k_count;
 
   return new;
 end;

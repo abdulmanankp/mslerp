@@ -34,6 +34,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     if (path.startsWith("/universities")) return "Universities";
     if (path.startsWith("/coordinators")) return "Coordinators";
     if (path.startsWith("/analytics")) return "Analytics";
+    if (path.startsWith("/university-analytics")) return "University Analytics";
     if (path.startsWith("/settings")) return "Profile";
     if (path.startsWith("/users")) return "Users";
     if (path.startsWith("/goals")) return "Goals";
@@ -41,6 +42,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     if (path.startsWith("/markazi-team")) return "Markazi Team";
     if (path.startsWith("/madadgar-teams")) return "Madadgar";
     if (path.startsWith("/president-schedule")) return "Schedule";
+    if (path.startsWith("/vision12k")) return "Vision 12K";
     return "MSL ERP";
   })();
 

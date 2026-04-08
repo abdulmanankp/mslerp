@@ -34,6 +34,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import html2canvas from "html2canvas";
 import { Activity, CalendarRange, Download, Filter, Radio, Search } from "lucide-react";
+import { savePdfDocument } from "@/lib/exportUtils";
 
 type Timeframe = "daily" | "weekly" | "monthly" | "yearly";
 type ActivityFilter = "all" | `activity:${string}`;
@@ -344,6 +345,33 @@ export default function Analytics() {
 
   const totalCompleted = districtPerformanceAll.reduce((sum, row) => sum + row.totalCompleted, 0);
   const uniqueDistricts = new Set(filteredRecords.map((row) => row.districtId)).size;
+  const vision12KDistrictRows = useMemo(() => {
+    const map = new Map<string, { districtName: string; totalVision12K: number; reportCount: number }>();
+
+    filteredRecords.forEach((row) => {
+      const current = map.get(row.districtId) || {
+        districtName: districtNameById.get(row.districtId) || row.districtName,
+        totalVision12K: 0,
+        reportCount: 0,
+      };
+
+      current.totalVision12K += row.vision12KCount || 0;
+      current.reportCount += 1;
+      map.set(row.districtId, current);
+    });
+
+    return Array.from(map.entries())
+      .map(([districtId, item]) => ({
+        districtId,
+        districtName: item.districtName,
+        totalVision12K: item.totalVision12K,
+        reportCount: item.reportCount,
+      }))
+      .sort((a, b) => b.totalVision12K - a.totalVision12K);
+  }, [filteredRecords, districtNameById]);
+
+  const totalVision12K = vision12KDistrictRows.reduce((sum, row) => sum + row.totalVision12K, 0);
+  const topVision12KDistrict = vision12KDistrictRows[0] || null;
 
   const bestReport = useMemo(() => {
     const ranked = filteredRecords.map((row) => {
@@ -441,6 +469,8 @@ export default function Analytics() {
           ["Records In Range", String(filteredRecords.length)],
           ["Districts Reporting", String(uniqueDistricts)],
           ["Total Completed Qty (Overall)", String(totalCompleted)],
+          ["Vision 12K Total", String(totalVision12K)],
+          ["Vision 12K Top District", topVision12KDistrict ? `${topVision12KDistrict.districtName} | ${topVision12KDistrict.totalVision12K}` : "N/A"],
           ["Top District Performer (Filtered)", topDistrictPerformer ? topDistrictPerformer.districtName : "N/A"],
           ["Best Activity Performance", topDistrictPerformer ? `${topDistrictPerformer.districtName} | Qty ${topDistrictPerformer.totalCompleted}` : "N/A"],
           ["Best Report", bestReport ? `${bestReport.districtName} | ${bestReport.meetingDate}` : "N/A"],
@@ -473,7 +503,20 @@ export default function Analytics() {
         theme: "grid",
       });
 
-      const searchedY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || finalY + 8;
+      const visionY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || finalY + 8;
+      autoTable(doc, {
+        startY: visionY + 8,
+        head: [["Vision 12K District", "Attached People", "Reports"]],
+        body: vision12KDistrictRows.length > 0
+          ? vision12KDistrictRows.map((d) => [d.districtName, String(d.totalVision12K), String(d.reportCount)])
+          : [["No Vision 12K data", "0", "0"]],
+        styles: { fontSize: 9, cellPadding: 3, textColor: [20, 35, 29] },
+        headStyles: { fillColor: [14, 165, 233], textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [236, 246, 255] },
+        theme: "grid",
+      });
+
+      const searchedY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || visionY + 8;
       autoTable(doc, {
         startY: searchedY + 8,
         head: [["District Search Result", "Reports", "Completed Qty"]],
@@ -486,7 +529,7 @@ export default function Analytics() {
         theme: "grid",
       });
 
-      doc.save("Live_Analytics_Report.pdf");
+      void savePdfDocument(doc, "Live_Analytics_Report.pdf");
     } finally {
       setIsExporting(false);
     }
@@ -535,7 +578,7 @@ export default function Analytics() {
           </div>
         </section>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
           <Card>
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">Records In Range</p>
@@ -558,6 +601,12 @@ export default function Analytics() {
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">Best Report Qty</p>
               <p className="mt-1 text-2xl font-semibold text-[#013122]">{bestReport?.completed ?? 0}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Vision 12K Total</p>
+              <p className="mt-1 text-2xl font-semibold text-[#013122]">{totalVision12K}</p>
             </CardContent>
           </Card>
         </div>
@@ -627,6 +676,28 @@ export default function Analytics() {
                   </>
                 ) : (
                   <p className="mt-1 text-sm text-muted-foreground">No reports found in selected filters.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-[#d5e8de] bg-[#f6fbf8] p-3">
+                <p className="text-xs text-muted-foreground">Vision 12K Overview</p>
+                <p className="mt-1 text-base font-semibold text-[#013122]">Total attached people: {totalVision12K}</p>
+                <p className="text-xs text-muted-foreground">
+                  Top district: {topVision12KDistrict ? `${topVision12KDistrict.districtName} (${topVision12KDistrict.totalVision12K})` : "N/A"}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
+                <p className="text-xs text-muted-foreground">Vision 12K District Leader</p>
+                {topVision12KDistrict ? (
+                  <>
+                    <p className="mt-1 text-base font-semibold text-[#013122]">{topVision12KDistrict.districtName}</p>
+                    <p className="text-xs text-muted-foreground">Attached people: {topVision12KDistrict.totalVision12K} | Reports: {topVision12KDistrict.reportCount}</p>
+                  </>
+                ) : (
+                  <p className="mt-1 text-sm text-muted-foreground">No Vision 12K data in selected filters.</p>
                 )}
               </div>
             </div>
@@ -726,6 +797,23 @@ export default function Analytics() {
                   <YAxis dataKey="districtName" type="category" width={80} tick={{ fontSize: 10 }} />
                   <Tooltip />
                   <Bar dataKey="totalCompleted" fill="#ec4899" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card data-export-chart="true">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Vision 12K District Rankings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={vision12KDistrictRows.slice(0, 10)} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis dataKey="districtName" type="category" width={80} tick={{ fontSize: 10 }} />
+                  <Tooltip />
+                  <Bar dataKey="totalVision12K" fill="#0ea5e9" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>

@@ -272,6 +272,7 @@ export interface DistrictMeetingRecord {
   nextMonthTasks: NextMonthTask[];
   attendance?: "Present" | "Absent" | "Late";
   attendanceCount?: number;
+  vision12KCount?: number;
   attendees?: MeetingAttendee[];
   mediaReport?: DistrictMediaReport;
 }

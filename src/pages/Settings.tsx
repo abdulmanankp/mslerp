@@ -15,6 +15,11 @@ import { firebaseAuth, firestore } from "@/integrations/firebase/client";
 import { useDistricts } from "@/hooks/useFirebaseData";
 import { useAuth } from "@/contexts/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import {
+  ensureNotificationPermissions,
+  getNotificationPermissionState,
+  setReminderPreference,
+} from "@/lib/mobileReminders";
 import type { AppUserPermissions, UserRole } from "@/types";
 import { Shield, Download, Bell, Globe, UserRound } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -60,6 +65,7 @@ export default function Settings() {
   const [profileName, setProfileName] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
+  const [taskRemindersEnabled, setTaskRemindersEnabled] = useState(true);
 
   const canManageUsers = userRole === "admin";
 
@@ -67,6 +73,13 @@ export default function Settings() {
     const inferred = userProfile?.fullName || user?.displayName || user?.email?.split("@")[0] || "";
     setProfileName(inferred);
   }, [user, userProfile]);
+
+  useEffect(() => {
+    void (async () => {
+      const granted = await getNotificationPermissionState();
+      setTaskRemindersEnabled(granted);
+    })();
+  }, []);
 
   const avatarThemes = [
     "bg-[#f4c7b8] text-[#4a231a]",
@@ -128,6 +141,30 @@ export default function Settings() {
     } finally {
       setSendingReset(false);
     }
+  };
+
+  const handleTaskReminderToggle = async (enabled: boolean) => {
+    if (!enabled) {
+      setReminderPreference(false);
+      setTaskRemindersEnabled(false);
+      toast({ title: "Task reminders disabled", description: "You can enable them again anytime." });
+      return;
+    }
+
+    const granted = await ensureNotificationPermissions();
+    if (!granted) {
+      setTaskRemindersEnabled(false);
+      toast({
+        title: "Permission required",
+        description: "Please allow notifications from app settings to enable reminders.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setReminderPreference(true);
+    setTaskRemindersEnabled(true);
+    toast({ title: "Task reminders enabled", description: "Upcoming task and schedule alerts are now active." });
   };
 
   const mapDesignationToAccessRole = (designation: UserRole): "admin" | "moderator" | "user" | "university_manager" => {
@@ -340,7 +377,7 @@ export default function Settings() {
                 <p className="text-sm font-medium">Task Reminders</p>
                 <p className="text-xs text-muted-foreground">Get reminded before task deadlines</p>
               </div>
-              <Switch defaultChecked />
+              <Switch checked={taskRemindersEnabled} onCheckedChange={handleTaskReminderToggle} />
             </div>
           </CardContent>
         </Card>

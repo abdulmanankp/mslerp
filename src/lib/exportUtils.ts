@@ -17,6 +17,92 @@ import type {
   MadadgarCoordinator,
 } from "@/types";
 
+const PDF_MIME_TYPE = "application/pdf";
+const XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+function sanitizeFileName(fileName: string) {
+  return fileName.replace(/[\\/:*?"<>|]/g, "_");
+}
+
+function toBase64(bytes: Uint8Array) {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+async function saveBinaryNative(fileName: string, mimeType: string, bytes: Uint8Array): Promise<boolean> {
+  try {
+    const { Capacitor } = await import("@capacitor/core");
+    if (!Capacitor.isNativePlatform()) return false;
+
+    const [{ Filesystem, Directory }, { Share }] = await Promise.all([
+      import("@capacitor/filesystem"),
+      import("@capacitor/share"),
+    ]);
+
+    if (typeof Filesystem.checkPermissions === "function") {
+      const permission = await Filesystem.checkPermissions();
+      if (permission.publicStorage === "prompt") {
+        await Filesystem.requestPermissions();
+      }
+    }
+
+    const safeFileName = sanitizeFileName(fileName);
+    const filePath = `exports/${Date.now()}_${safeFileName}`;
+    const result = await Filesystem.writeFile({
+      path: filePath,
+      data: toBase64(bytes),
+      directory: Directory.Documents,
+      recursive: true,
+    });
+
+    await Share.share({
+      title: "Export Ready",
+      text: `Saved file: ${safeFileName}`,
+      url: result.uri,
+      dialogTitle: "Share exported file",
+    });
+
+    return true;
+  } catch (error) {
+    console.warn("Native file save failed, falling back to browser download.", { fileName, mimeType, error });
+    return false;
+  }
+}
+
+function downloadInBrowser(fileName: string, mimeType: string, bytes: Uint8Array) {
+  const blob = new Blob([bytes], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+export async function savePdfDocument(doc: jsPDF, fileName: string) {
+  const buffer = doc.output("arraybuffer") as ArrayBuffer;
+  const bytes = new Uint8Array(buffer);
+  const savedNatively = await saveBinaryNative(fileName, PDF_MIME_TYPE, bytes);
+  if (!savedNatively) {
+    doc.save(fileName);
+  }
+}
+
+export async function saveWorkbookDocument(workbook: XLSX.WorkBook, fileName: string) {
+  const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+  const bytes = new Uint8Array(buffer);
+  const savedNatively = await saveBinaryNative(fileName, XLSX_MIME_TYPE, bytes);
+  if (!savedNatively) {
+    downloadInBrowser(fileName, XLSX_MIME_TYPE, bytes);
+  }
+}
+
 // ─── PDF Helpers ───
 
 function addHeader(doc: jsPDF, title: string, subtitle?: string) {
@@ -70,6 +156,7 @@ export function exportDistrictReportPDF(record: DistrictMeetingRecord, districts
     { label: "Status", value: record.status },
     { label: "Attendance", value: record.attendance || "N/A" },
     { label: "Activities", value: record.activityReports.length },
+    { label: "Vision 12K", value: record.vision12KCount || 0 },
     { label: "Total Completed", value: totalActivities },
   ]);
 
@@ -136,7 +223,7 @@ export function exportDistrictReportPDF(record: DistrictMeetingRecord, districts
     doc.setPage(i); doc.setFontSize(7); doc.setTextColor(150);
     doc.text(`MSL ERP Portal · Generated ${new Date().toLocaleString()} · Page ${i}/${pageCount}`, 14, 290);
   }
-  doc.save(`${record.districtName}_${record.month}_Report.pdf`);
+  void savePdfDocument(doc, `${record.districtName}_${record.month}_Report.pdf`);
 }
 
 // ─── Export Full Meeting Report (PDF) ───
@@ -214,7 +301,7 @@ export function exportFullMeetingPDF(meeting: Meeting, records: DistrictMeetingR
     doc.setPage(i); doc.setFontSize(7); doc.setTextColor(150);
     doc.text(`MSL ERP Portal · ${meeting.title} · Generated ${new Date().toLocaleString()} · Page ${i}/${pageCount}`, 14, 290);
   }
-  doc.save(`${meeting.title.replace(/\s+/g, "_")}_Full_Report.pdf`);
+  void savePdfDocument(doc, `${meeting.title.replace(/\s+/g, "_")}_Full_Report.pdf`);
 }
 
 // ─── Export Full Meeting (Excel) ───
@@ -255,7 +342,7 @@ export function exportFullMeetingExcel(meeting: Meeting, records: DistrictMeetin
   });
   if (activityRows.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(activityRows), "Activity Details");
 
-  XLSX.writeFile(wb, `${meeting.title.replace(/\s+/g, "_")}_Report.xlsx`);
+  void saveWorkbookDocument(wb, `${meeting.title.replace(/\s+/g, "_")}_Report.xlsx`);
 }
 
 // ─── Monthly Overall Meetings Export (Excel) ───
@@ -314,7 +401,7 @@ export function exportMonthlyOverallMeetingsExcel(month: string, meetings: Meeti
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(districtRows), "District Details");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([totals]), "Totals");
 
-  XLSX.writeFile(wb, `${month.replace(/[^\w-]/g, "_")}_Monthly_Overall_Report.xlsx`);
+  void saveWorkbookDocument(wb, `${month.replace(/[^\w-]/g, "_")}_Monthly_Overall_Report.xlsx`);
 }
 
 // ─── Export Single District Report (Excel) ───
@@ -323,7 +410,7 @@ export function exportDistrictReportExcel(record: DistrictMeetingRecord, distric
   const wb = XLSX.utils.book_new();
   const district = districts.find(d => d.id === record.districtId);
 
-  const info = [{ District: record.districtName, Zone: district?.zone || "", Meeting: record.meetingTitle, Date: record.meetingDate, Status: record.status, Attendance: record.attendance || "N/A", Notes: record.notes }];
+  const info = [{ District: record.districtName, Zone: district?.zone || "", Meeting: record.meetingTitle, Date: record.meetingDate, Status: record.status, Attendance: record.attendance || "N/A", "Vision 12K": record.vision12KCount || 0, Notes: record.notes }];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(info), "Info");
 
   if (record.activityReports.length > 0) {
@@ -348,7 +435,7 @@ export function exportDistrictReportExcel(record: DistrictMeetingRecord, distric
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(media), "Media Report");
   }
 
-  XLSX.writeFile(wb, `${record.districtName}_${record.month}_Report.xlsx`);
+  void saveWorkbookDocument(wb, `${record.districtName}_${record.month}_Report.xlsx`);
 }
 
 export function exportUniversityReportPDF(
@@ -478,7 +565,7 @@ export function exportUniversityReportPDF(
     doc.setTextColor(150);
     doc.text(`MSL ERP Portal · Generated ${new Date().toLocaleString()} · Page ${i}/${pageCount}`, 14, 290);
   }
-  doc.save(`${record.universityName}_${record.month}_Report.pdf`);
+  void savePdfDocument(doc, `${record.universityName}_${record.month}_Report.pdf`);
 }
 
 export function exportUniversityReportExcel(record: UniversityMeetingRecord, campaigns: UniversityGoal[]) {
@@ -542,7 +629,7 @@ export function exportUniversityReportExcel(record: UniversityMeetingRecord, cam
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(campaignRows), "Campaigns");
   }
 
-  XLSX.writeFile(wb, `${record.universityName}_${record.month}_Report.xlsx`);
+  void saveWorkbookDocument(wb, `${record.universityName}_${record.month}_Report.xlsx`);
 }
 
 export function exportUniversityCampaignAnalyticsExcel(university: University, goals: UniversityGoal[]) {
@@ -588,7 +675,7 @@ export function exportUniversityCampaignAnalyticsExcel(university: University, g
   }));
 
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), "Scenario Summary");
-  XLSX.writeFile(wb, `${university.name}_Campaign_Analytics.xlsx`);
+  void saveWorkbookDocument(wb, `${university.name}_Campaign_Analytics.xlsx`);
 }
 
 export function exportUniversityCampaignAnalyticsPDF(university: University, goals: UniversityGoal[]) {
@@ -637,7 +724,7 @@ export function exportUniversityCampaignAnalyticsPDF(university: University, goa
     doc.setTextColor(150);
     doc.text(`MSL ERP Portal · Generated ${new Date().toLocaleString()} · Page ${i}/${pageCount}`, 14, 290);
   }
-  doc.save(`${university.name}_Campaign_Analytics.pdf`);
+  void savePdfDocument(doc, `${university.name}_Campaign_Analytics.pdf`);
 }
 
 // ─── Zone Report Export (PDF) ───
@@ -681,7 +768,7 @@ export function exportZoneReportPDF(zoneName: string, districts: District[], coo
 
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) { doc.setPage(i); doc.setFontSize(7); doc.setTextColor(150); doc.text(`MSL ERP Portal · ${zoneName} · Generated ${new Date().toLocaleString()} · Page ${i}/${pageCount}`, 14, 290); }
-  doc.save(`${zoneName.replace(/\s+/g, "_")}_Zone_Report.pdf`);
+  void savePdfDocument(doc, `${zoneName.replace(/\s+/g, "_")}_Zone_Report.pdf`);
 }
 
 // ─── Zone Report Export (Excel) ───
@@ -708,7 +795,7 @@ export function exportZoneReportExcel(zoneName: string, districts: District[], c
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(goalData), "Goals");
   }
 
-  XLSX.writeFile(wb, `${zoneName.replace(/\s+/g, "_")}_Zone_Report.xlsx`);
+  void saveWorkbookDocument(wb, `${zoneName.replace(/\s+/g, "_")}_Zone_Report.xlsx`);
 }
 
 // ─── Districts List Export ───
@@ -720,7 +807,7 @@ export function exportDistrictsExcel(filteredDistricts: District[], coordinators
     return { District: d.name, Zone: d.zone, Division: d.division, Population: d.population || "", Coordinator: coord?.name || "Unassigned", Status: d.status };
   });
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "Districts");
-  XLSX.writeFile(wb, "Districts_Report.xlsx");
+  void saveWorkbookDocument(wb, "Districts_Report.xlsx");
 }
 
 export function exportDistrictsPDF(filteredDistricts: District[], coordinators: Coordinator[]) {
@@ -737,7 +824,59 @@ export function exportDistrictsPDF(filteredDistricts: District[], coordinators: 
     styles: { fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: [16, 185, 129] }, theme: "grid",
   });
 
-  doc.save("Districts_Report.pdf");
+  void savePdfDocument(doc, "Districts_Report.pdf");
+}
+
+type Vision12KAnalyticsRow = {
+  districtName: string;
+  zone: string;
+  totalVision12K: number;
+  reportCount: number;
+  latestMeetingDate: string | null;
+};
+
+export function exportVision12KAnalyticsExcel(rows: Vision12KAnalyticsRow[]) {
+  const wb = XLSX.utils.book_new();
+  const data = rows.map((row) => ({
+    District: row.districtName,
+    Zone: row.zone,
+    "Attached People": row.totalVision12K,
+    Reports: row.reportCount,
+    "Latest Meeting": row.latestMeetingDate || "",
+  }));
+
+  const summarySheet = XLSX.utils.json_to_sheet([
+    { Metric: "Districts", Value: rows.length },
+    { Metric: "Total Attached People", Value: rows.reduce((sum, row) => sum + row.totalVision12K, 0) },
+    { Metric: "Total Reports", Value: rows.reduce((sum, row) => sum + row.reportCount, 0) },
+    { Metric: "Top District", Value: rows[0] ? `${rows[0].districtName} (${rows[0].totalVision12K})` : "N/A" },
+  ]);
+
+  XLSX.utils.book_append_sheet(wb, summarySheet, "Summary");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "Vision12K");
+  void saveWorkbookDocument(wb, "Vision12K_Analytics.xlsx");
+}
+
+export function exportVision12KAnalyticsPDF(rows: Vision12KAnalyticsRow[]) {
+  const doc = new jsPDF();
+  addHeader(doc, "Vision 12K Analytics", `${rows.length} districts · Generated ${new Date().toLocaleDateString()}`);
+
+  autoTable(doc, {
+    startY: 42,
+    head: [["District", "Zone", "Attached People", "Reports", "Latest Meeting"]],
+    body: rows.map((row) => [
+      row.districtName,
+      row.zone,
+      String(row.totalVision12K),
+      String(row.reportCount),
+      row.latestMeetingDate || "—",
+    ]),
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [14, 165, 233] },
+    theme: "grid",
+  });
+
+  void savePdfDocument(doc, "Vision12K_Analytics.pdf");
 }
 
 export function exportUniversitiesExcel(universities: University[], coordinators: UniversityCoordinator[]) {
@@ -753,7 +892,7 @@ export function exportUniversitiesExcel(universities: University[], coordinators
     };
   });
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "Universities");
-  XLSX.writeFile(wb, "Universities_Report.xlsx");
+  void saveWorkbookDocument(wb, "Universities_Report.xlsx");
 }
 
 export function exportUniversitiesPDF(universities: University[], coordinators: UniversityCoordinator[]) {
@@ -770,7 +909,7 @@ export function exportUniversitiesPDF(universities: University[], coordinators: 
     headStyles: { fillColor: [16, 185, 129] },
     theme: "grid",
   });
-  doc.save("Universities_Report.pdf");
+  void savePdfDocument(doc, "Universities_Report.pdf");
 }
 
 export function exportMadadgarTeamsExcel(teams: MadadgarTeam[], coordinators: MadadgarCoordinator[]) {
@@ -786,7 +925,7 @@ export function exportMadadgarTeamsExcel(teams: MadadgarTeam[], coordinators: Ma
     };
   });
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "Madadgar Teams");
-  XLSX.writeFile(wb, "Madadgar_Teams_Report.xlsx");
+  void saveWorkbookDocument(wb, "Madadgar_Teams_Report.xlsx");
 }
 
 export function exportMadadgarTeamsPDF(teams: MadadgarTeam[], coordinators: MadadgarCoordinator[]) {
@@ -803,5 +942,5 @@ export function exportMadadgarTeamsPDF(teams: MadadgarTeam[], coordinators: Mada
     headStyles: { fillColor: [59, 130, 246] },
     theme: "grid",
   });
-  doc.save("Madadgar_Teams_Report.pdf");
+  void savePdfDocument(doc, "Madadgar_Teams_Report.pdf");
 }

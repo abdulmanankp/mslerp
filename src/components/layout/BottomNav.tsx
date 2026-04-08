@@ -34,6 +34,7 @@ const primaryNav = [
 const moreNav = [
   { to: "/zones",               icon: MapPin,        label: "Zones"       },
   { to: "/universities",        icon: GraduationCap, label: "Universities"},
+  { to: "/university-analytics",icon: BarChart3,     label: "Uni Analytics"},
   { to: "/madadgar-teams",      icon: HandHelping,   label: "Madadgar"    },
   { to: "/coordinators",        icon: Users,         label: "Coordinators"},
   { to: "/markazi-team",        icon: UsersRound,    label: "Markazi Team"},
@@ -41,6 +42,7 @@ const moreNav = [
   { to: "/activities",          icon: Activity,      label: "Activities"  },
   { to: "/goals",               icon: Target,        label: "Goals"       },
   { to: "/president-schedule",  icon: CalendarDays,  label: "Schedule"    },
+  { to: "/vision12k",            icon: UsersRound,    label: "Vision 12K"  },
   { to: "/analytics",           icon: BarChart3,     label: "Analytics"   },
   { to: "/settings",            icon: Settings,      label: "Settings"    },
 ];

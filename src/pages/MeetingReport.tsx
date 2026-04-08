@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useDistrictMeetingRecords, useDistricts, useMeetings, useActivities, useGoals, useUpdateDistrictMeetingRecord, LoadingSkeleton } from "@/hooks/useFirebaseData";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, FileText, Plus, Download, Save, Pencil, X, ListTodo, MessageSquare, ClipboardList, Trash2 } from "lucide-react";
+import { ArrowLeft, FileText, Plus, Download, Save, Pencil, X, ListTodo, MessageSquare, ClipboardList, Trash2, Target } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { ActivityReport, CustomActivity, DistrictMediaReport, MeetingAttendee, NextMonthTask } from "@/types";
 import { exportDistrictReportPDF, exportDistrictReportExcel } from "@/lib/exportUtils";
@@ -41,6 +41,7 @@ export default function MeetingReport() {
   const [notes, setNotes] = useState("");
   const [attendance, setAttendance] = useState("");
   const [attendanceCount, setAttendanceCount] = useState(0);
+  const [vision12KCount, setVision12KCount] = useState(0);
   const [attendees, setAttendees] = useState<MeetingAttendee[]>([]);
   const [mediaReport, setMediaReport] = useState<DistrictMediaReport>({
     contentProduction: 0,
@@ -60,6 +61,7 @@ export default function MeetingReport() {
       setNotes(record.notes || "");
       setAttendance(record.attendance || "");
       setAttendanceCount(record.attendanceCount || 0);
+      setVision12KCount(record.vision12KCount || 0);
       setAttendees(record.attendees || []);
       const hasMedia = !!record.mediaReport;
       setIncludeMediaReport(hasMedia);
@@ -134,6 +136,7 @@ export default function MeetingReport() {
         notes,
         attendance: attendance as "Present" | "Absent" | "Late" | undefined,
         attendanceCount,
+        vision12KCount,
         attendees,
         mediaReport: includeMediaReport ? mediaReport : null,
         activityReports,
@@ -204,6 +207,32 @@ export default function MeetingReport() {
             </CardContent>
           </Card>
         )}
+
+        <Card className="border-none shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2"><Target className="h-4 w-4 text-primary" /> Vision 12K Attachment Report</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isEditable ? (
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">People attached with us in Vision 12K</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={vision12KCount}
+                  onChange={(e) => setVision12KCount(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                  placeholder="0"
+                />
+                <p className="text-xs text-muted-foreground">Update this count for each meeting report.</p>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-3">
+                <p className="text-xs text-muted-foreground">Vision 12K attached people</p>
+                <p className="mt-1 text-lg font-semibold font-mono">{vision12KCount || 0}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card className="border-none shadow-sm">
           <CardHeader className="pb-2">

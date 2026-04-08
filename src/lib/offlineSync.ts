@@ -43,6 +43,7 @@ const CACHE_STORE = "collection_cache";
 let nativeOnlineState: boolean | null = null;
 let connectivityInitialized = false;
 let removeNativeNetworkListener: (() => void) | null = null;
+let nativeConnectivityUnavailable = false;
 
 function canUseIndexedDb() {
   return typeof window !== "undefined" && typeof window.indexedDB !== "undefined";
@@ -82,6 +83,14 @@ function txComplete(tx: IDBTransaction): Promise<void> {
 
 export function isOnlineNow() {
   if (nativeOnlineState !== null) return nativeOnlineState;
+
+  // In native builds, queue first until we get a confirmed network status.
+  if (typeof window !== "undefined") {
+    const capacitor = (window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+    const isNative = !!capacitor?.isNativePlatform?.();
+    if (isNative && !nativeConnectivityUnavailable) return false;
+  }
+
   if (typeof navigator === "undefined") return true;
   return navigator.onLine;
 }
@@ -102,10 +111,16 @@ async function initializeNativeConnectivity(): Promise<void> {
 
     const networkModule = await import(/* @vite-ignore */ networkModuleName);
     const network = networkModule?.Network;
-    if (!network) return;
+    if (!network) {
+      nativeConnectivityUnavailable = true;
+      return;
+    }
 
     const initialStatus = await network.getStatus();
     nativeOnlineState = !!initialStatus?.connected;
+    if (nativeOnlineState) {
+      void processOfflineQueue();
+    }
 
     const listenerHandle = await network.addListener("networkStatusChange", (status: { connected: boolean }) => {
       nativeOnlineState = !!status.connected;
@@ -122,6 +137,7 @@ async function initializeNativeConnectivity(): Promise<void> {
       }
     };
   } catch {
+    nativeConnectivityUnavailable = true;
     // Capacitor network plugin may be unavailable in web; fallback to navigator.onLine.
   }
 }
