@@ -58,6 +58,7 @@ export default function MeetingDetail() {
   });
 
   const completedCount = records.filter(r => r.status === "Completed").length;
+  const nextPendingDistrict = meetingDistricts.find(({ record }) => record?.status !== "Completed");
 
   return (
     <AppLayout>
@@ -68,6 +69,15 @@ export default function MeetingDetail() {
             <h1 className="text-2xl font-bold tracking-tight">{meeting.title}</h1>
             <p className="text-muted-foreground text-sm">{meeting.meetingDate} · {meeting.scope === "All" ? "All Districts" : meeting.scopeValue || meeting.scope}</p>
           </div>
+          {nextPendingDistrict && (
+            <Button
+              size="sm"
+              className="gap-1.5 hidden sm:flex"
+              onClick={() => navigate(`/meetings/${id}/report/${nextPendingDistrict.district.id}`)}
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Next Pending
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-1.5 hidden sm:flex"><Download className="h-3.5 w-3.5" /> Export All</Button>

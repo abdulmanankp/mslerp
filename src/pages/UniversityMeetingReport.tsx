@@ -97,6 +97,11 @@ export default function UniversityMeetingReport() {
   const [campaignTarget, setCampaignTarget] = useState("");
   const [campaignScenarioId, setCampaignScenarioId] = useState("admissions");
   const [campaignNotes, setCampaignNotes] = useState("");
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [bulkTaskActivityType, setBulkTaskActivityType] = useState("");
+  const [bulkTaskTarget, setBulkTaskTarget] = useState("");
+  const [bulkTaskDeadline, setBulkTaskDeadline] = useState("");
+  const [bulkTaskNotes, setBulkTaskNotes] = useState("");
   const [campaignProgress, setCampaignProgress] = useState<Record<string, {
     baseCompleted: number;
     baseApproached: number;
@@ -148,6 +153,29 @@ export default function UniversityMeetingReport() {
     setCampaignProgress(progressMap);
   }, [ongoingCampaigns]);
 
+  useEffect(() => {
+    setSelectedTaskIds((prev) => prev.filter((taskId) => nextMonthTasks.some((task) => task.id === taskId)));
+  }, [nextMonthTasks]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+
+      if (event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        document.querySelector<HTMLButtonElement>('button[data-quick-save="university-report"]')?.click();
+      }
+
+      if (event.key === "Enter") {
+        event.preventDefault();
+        document.querySelector<HTMLButtonElement>('button[data-quick-save-next="university-report"]')?.click();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const isLoading = mL || uL || rL || aL || cL || scL;
   if (isLoading) return <AppLayout><LoadingSkeleton /></AppLayout>;
 
@@ -168,6 +196,11 @@ export default function UniversityMeetingReport() {
   const canManageUniversityCampaigns = isAdmin || !!userPermissions?.canManageUniversityCampaigns;
   const canExportUniversityReports = isAdmin || !!userPermissions?.canExportUniversityReports;
   const isEditable = canManageUniversityRecords && (editing || !isCompleted);
+  const nextPendingUniversityId = meeting.universityIds.find((candidateUniversityId) => {
+    if (candidateUniversityId === universityId) return false;
+    const candidateRecord = records.find((entry) => entry.universityId === candidateUniversityId);
+    return candidateRecord?.status !== "Completed";
+  });
 
   // Combine default and custom scenarios
   const allScenarios: UniversityScenario[] = [
@@ -206,6 +239,40 @@ export default function UniversityMeetingReport() {
     ]);
   };
 
+  const toggleTaskSelection = (taskId: string, checked: boolean) => {
+    setSelectedTaskIds((prev) => {
+      if (checked) return prev.includes(taskId) ? prev : [...prev, taskId];
+      return prev.filter((id) => id !== taskId);
+    });
+  };
+
+  const selectMajorityTasks = () => {
+    if (nextMonthTasks.length === 0) return;
+    const majorityCount = Math.floor(nextMonthTasks.length / 2) + 1;
+    setSelectedTaskIds(nextMonthTasks.slice(0, majorityCount).map((task) => task.id));
+  };
+
+  const applyBulkToSelectedTasks = () => {
+    if (selectedTaskIds.length === 0) {
+      toast({ title: "No tasks selected", description: "Select tasks first, then apply bulk values.", variant: "destructive" });
+      return;
+    }
+
+    setNextMonthTasks((prev) => prev.map((task) => {
+      if (!selectedTaskIds.includes(task.id)) return task;
+
+      return {
+        ...task,
+        activityType: bulkTaskActivityType || task.activityType,
+        targetQuantity: bulkTaskTarget !== "" ? Math.max(0, parseInt(bulkTaskTarget, 10) || 0) : task.targetQuantity,
+        deadline: bulkTaskDeadline || task.deadline,
+        notes: bulkTaskNotes || task.notes,
+      };
+    }));
+
+    toast({ title: "Applied", description: `Bulk values applied to ${selectedTaskIds.length} selected task(s).` });
+  };
+
   const updateCampaignProgress = (
     campaignId: string,
     field: "addCompleted" | "addApproached" | "addSuccessful" | "status",
@@ -233,10 +300,10 @@ export default function UniversityMeetingReport() {
     exportUniversityReportExcel(record, campaigns);
   };
 
-  const saveReport = async () => {
+  const persistReport = async (): Promise<boolean> => {
     if (!canManageUniversityRecords) {
       toast({ title: "Permission required", description: "You do not have access to update university records.", variant: "destructive" });
-      return;
+      return false;
     }
 
     try {
@@ -278,10 +345,29 @@ export default function UniversityMeetingReport() {
 
       setEditing(false);
       toast({ title: "Saved", description: "University report, tasks, and campaign progress saved successfully." });
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to save report.";
       toast({ title: "Save failed", description: message, variant: "destructive" });
+      return false;
     }
+  };
+
+  const saveReport = async () => {
+    await persistReport();
+  };
+
+  const saveAndNextUniversity = async () => {
+    const saved = await persistReport();
+    if (!saved) return;
+
+    if (nextPendingUniversityId) {
+      navigate(`/university-meetings/${meetingId}/report/${nextPendingUniversityId}`);
+      return;
+    }
+
+    toast({ title: "All done", description: "No pending university report left in this meeting." });
+    navigate(`/universities/${universityId}`);
   };
 
   const startCampaignInMeeting = async () => {
@@ -321,7 +407,7 @@ export default function UniversityMeetingReport() {
       setCampaignOpen(false);
       setCampaignActivityId("");
       setCampaignTarget("");
-      setCampaignScenario("Admissions");
+      setCampaignScenarioId("admissions");
       setCampaignNotes("");
       toast({ title: "Campaign started", description: "Campaign linked to this meeting and analytics." });
     } catch (error) {
@@ -347,7 +433,19 @@ export default function UniversityMeetingReport() {
             {isCompleted && !editing && <Button variant="outline" size="sm" className="text-xs" disabled={!canManageUniversityRecords} onClick={() => setEditing(true)}><Eye className="h-3.5 w-3.5 mr-1" /> Edit Report</Button>}
             <Button variant="outline" size="sm" className="text-xs" disabled={!canExportUniversityReports} onClick={exportPdf}>Export PDF</Button>
             <Button variant="outline" size="sm" className="text-xs" disabled={!canExportUniversityReports} onClick={exportExcel}><FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> Export Excel</Button>
-            <Button size="sm" className="text-xs" disabled={!canManageUniversityRecords || updateRecord.isPending || updateCampaign.isPending} onClick={saveReport}><Save className="h-3.5 w-3.5 mr-1" /> {updateRecord.isPending || updateCampaign.isPending ? "Saving..." : "Save"}</Button>
+            <Button data-quick-save="university-report" size="sm" className="text-xs" disabled={!canManageUniversityRecords || updateRecord.isPending || updateCampaign.isPending} onClick={saveReport}><Save className="h-3.5 w-3.5 mr-1" /> {updateRecord.isPending || updateCampaign.isPending ? "Saving..." : "Save"}</Button>
+            {nextPendingUniversityId && (
+              <Button
+                data-quick-save-next="university-report"
+                size="sm"
+                variant="outline"
+                className="text-xs"
+                disabled={!canManageUniversityRecords || updateRecord.isPending || updateCampaign.isPending}
+                onClick={saveAndNextUniversity}
+              >
+                <Save className="h-3.5 w-3.5 mr-1" /> Save & Next Pending
+              </Button>
+            )}
           </div>
         </div>
 
@@ -434,17 +532,44 @@ export default function UniversityMeetingReport() {
 
         <Card className="border-none shadow-sm">
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-sm">Next Month Tasks</CardTitle>
-              {isEditable && <Button variant="outline" size="sm" className="text-xs gap-1" onClick={addNextMonthTask}><Plus className="h-3 w-3" /> Add Task</Button>}
+              {isEditable && (
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" className="text-xs gap-1" onClick={selectMajorityTasks}>Select Majority</Button>
+                  <Button variant="outline" size="sm" className="text-xs gap-1" onClick={() => setSelectedTaskIds([])}>Clear Selection</Button>
+                  <Button variant="outline" size="sm" className="text-xs gap-1" onClick={addNextMonthTask}><Plus className="h-3 w-3" /> Add Task</Button>
+                </div>
+              )}
             </div>
+            {isEditable && nextMonthTasks.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-2 pt-3">
+                <Select value={bulkTaskActivityType} onValueChange={setBulkTaskActivityType}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Bulk activity type" /></SelectTrigger>
+                  <SelectContent>{activities.filter((a) => a.status === "Active").map((a) => <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>)}</SelectContent>
+                </Select>
+                <Input className="h-8 text-xs" type="number" min={0} value={bulkTaskTarget} onChange={(e) => setBulkTaskTarget(e.target.value)} placeholder="Bulk target" />
+                <Input className="h-8 text-xs" type="date" value={bulkTaskDeadline} onChange={(e) => setBulkTaskDeadline(e.target.value)} />
+                <Input className="h-8 text-xs" value={bulkTaskNotes} onChange={(e) => setBulkTaskNotes(e.target.value)} placeholder="Bulk notes" />
+                <Button size="sm" className="h-8 text-xs" onClick={applyBulkToSelectedTasks}>Apply On Selected</Button>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="p-0">
             <Table>
-              <TableHeader><TableRow><TableHead>Task Name</TableHead><TableHead>Type</TableHead><TableHead>Target</TableHead><TableHead>Deadline</TableHead><TableHead>Notes</TableHead><TableHead></TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow>{isEditable && <TableHead className="w-10">Sel</TableHead>}<TableHead>Task Name</TableHead><TableHead>Type</TableHead><TableHead>Target</TableHead><TableHead>Deadline</TableHead><TableHead>Notes</TableHead><TableHead></TableHead></TableRow></TableHeader>
               <TableBody>
                 {nextMonthTasks.map((row, idx) => (
                   <TableRow key={row.id}>
+                    {isEditable && (
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          checked={selectedTaskIds.includes(row.id)}
+                          onChange={(e) => toggleTaskSelection(row.id, e.target.checked)}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell><Input className="h-7 text-xs" disabled={!isEditable} value={row.taskName} onChange={(e) => setNextMonthTasks((prev) => prev.map((item, i) => i === idx ? { ...item, taskName: e.target.value } : item))} /></TableCell>
                     <TableCell><Input className="h-7 text-xs" disabled={!isEditable} value={row.activityType} onChange={(e) => setNextMonthTasks((prev) => prev.map((item, i) => i === idx ? { ...item, activityType: e.target.value } : item))} /></TableCell>
                     <TableCell><Input type="number" className="w-20 h-7 text-xs" disabled={!isEditable} value={row.targetQuantity} onChange={(e) => setNextMonthTasks((prev) => prev.map((item, i) => i === idx ? { ...item, targetQuantity: Number(e.target.value) || 0 } : item))} /></TableCell>

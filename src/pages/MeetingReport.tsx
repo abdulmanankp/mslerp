@@ -52,6 +52,11 @@ export default function MeetingReport() {
     postingFrequency: "Weekly",
   });
   const [includeMediaReport, setIncludeMediaReport] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [bulkTaskActivityType, setBulkTaskActivityType] = useState("");
+  const [bulkTaskTarget, setBulkTaskTarget] = useState("");
+  const [bulkTaskDeadline, setBulkTaskDeadline] = useState("");
+  const [bulkTaskNotes, setBulkTaskNotes] = useState("");
 
   useEffect(() => {
     if (record) {
@@ -76,6 +81,10 @@ export default function MeetingReport() {
     }
   }, [record]);
 
+  useEffect(() => {
+    setSelectedTaskIds((prev) => prev.filter((taskId) => nextMonthTasks.some((task) => task.id === taskId)));
+  }, [nextMonthTasks]);
+
   if (rL || dL || mL || aL) return <AppLayout><LoadingSkeleton /></AppLayout>;
 
   if (!district || !meeting) {
@@ -86,6 +95,11 @@ export default function MeetingReport() {
 
   const isCompleted = record?.status === "Completed";
   const isEditable = editing || !isCompleted;
+  const nextPendingDistrictId = meeting.districtIds.find((candidateDistrictId) => {
+    if (candidateDistrictId === districtId) return false;
+    const candidateRecord = dmRecords.find((entry) => entry.districtId === candidateDistrictId);
+    return candidateRecord?.status !== "Completed";
+  });
 
   const handleUpdateActivityReport = (index: number, field: keyof ActivityReport, value: string | number) => {
     setActivityReports(prev => prev.map((ar, i) => i === index ? { ...ar, [field]: value } : ar));
@@ -104,6 +118,37 @@ export default function MeetingReport() {
   };
   const handleDeleteTask = (index: number) => setNextMonthTasks(prev => prev.filter((_, i) => i !== index));
   const handleAddTask = () => setNextMonthTasks(prev => [...prev, { id: `nmt_new_${Date.now()}`, taskName: "", activityType: "", targetQuantity: 0, deadline: "", notes: "" }]);
+  const toggleTaskSelection = (taskId: string, checked: boolean) => {
+    setSelectedTaskIds((prev) => {
+      if (checked) return prev.includes(taskId) ? prev : [...prev, taskId];
+      return prev.filter((id) => id !== taskId);
+    });
+  };
+  const selectMajorityTasks = () => {
+    if (nextMonthTasks.length === 0) return;
+    const majorityCount = Math.floor(nextMonthTasks.length / 2) + 1;
+    setSelectedTaskIds(nextMonthTasks.slice(0, majorityCount).map((task) => task.id));
+  };
+  const applyBulkToSelectedTasks = () => {
+    if (selectedTaskIds.length === 0) {
+      toast({ title: "No tasks selected", description: "Select tasks first, then apply bulk values.", variant: "destructive" });
+      return;
+    }
+
+    setNextMonthTasks((prev) => prev.map((task) => {
+      if (!selectedTaskIds.includes(task.id)) return task;
+
+      return {
+        ...task,
+        activityType: bulkTaskActivityType || task.activityType,
+        targetQuantity: bulkTaskTarget !== "" ? Math.max(0, parseInt(bulkTaskTarget, 10) || 0) : task.targetQuantity,
+        deadline: bulkTaskDeadline || task.deadline,
+        notes: bulkTaskNotes || task.notes,
+      };
+    }));
+
+    toast({ title: "Applied", description: `Bulk values applied to ${selectedTaskIds.length} selected task(s).` });
+  };
   const handleAttendanceCountChange = (raw: string) => {
     const count = Math.max(0, parseInt(raw, 10) || 0);
     setAttendanceCount(count);
@@ -123,10 +168,10 @@ export default function MeetingReport() {
     setMediaReport((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSaveReport = async () => {
+  const persistReport = async (): Promise<boolean> => {
     if (!record?.id) {
       toast({ title: "Record not found", description: "Unable to save this report.", variant: "destructive" });
-      return;
+      return false;
     }
 
     try {
@@ -147,11 +192,49 @@ export default function MeetingReport() {
 
       setEditing(false);
       toast({ title: "Saved", description: "Meeting report saved to Firebase." });
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to save report.";
       toast({ title: "Save failed", description: message, variant: "destructive" });
+      return false;
     }
   };
+
+  const handleSaveReport = async () => {
+    await persistReport();
+  };
+
+  const handleSaveAndNext = async () => {
+    const saved = await persistReport();
+    if (!saved) return;
+
+    if (nextPendingDistrictId) {
+      navigate(`/meetings/${meetingId}/report/${nextPendingDistrictId}`);
+      return;
+    }
+
+    toast({ title: "All done", description: "No pending district report left in this meeting." });
+    navigate(`/meetings/${meetingId}`);
+  };
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+
+      if (event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        void handleSaveReport();
+      }
+
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void handleSaveAndNext();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [meetingId, nextPendingDistrictId, updateDistrictMeetingRecord.isPending]);
 
   return (
     <AppLayout>
@@ -181,6 +264,17 @@ export default function MeetingReport() {
               </DropdownMenuContent>
             </DropdownMenu>
             <Button size="sm" className="gap-1.5 text-xs" onClick={handleSaveReport} disabled={updateDistrictMeetingRecord.isPending}><Save className="h-3.5 w-3.5" /> {updateDistrictMeetingRecord.isPending ? "Saving..." : "Save"}</Button>
+            {nextPendingDistrictId && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-xs"
+                onClick={handleSaveAndNext}
+                disabled={updateDistrictMeetingRecord.isPending}
+              >
+                <Save className="h-3.5 w-3.5" /> Save & Next Pending
+              </Button>
+            )}
           </div>
         </div>
 
@@ -400,18 +494,45 @@ export default function MeetingReport() {
 
         <Card className="border-none shadow-sm">
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-sm flex items-center gap-2"><ListTodo className="h-4 w-4 text-primary" /> Next Month Tasks</CardTitle>
-              {isEditable && <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={handleAddTask}><Plus className="h-3 w-3" /> Add Task</Button>}
+              {isEditable && (
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={selectMajorityTasks}>Select Majority</Button>
+                  <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => setSelectedTaskIds([])}>Clear Selection</Button>
+                  <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={handleAddTask}><Plus className="h-3 w-3" /> Add Task</Button>
+                </div>
+              )}
             </div>
+            {isEditable && nextMonthTasks.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-2 pt-3">
+                <Select value={bulkTaskActivityType} onValueChange={setBulkTaskActivityType}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Bulk activity type" /></SelectTrigger>
+                  <SelectContent>{activitiesList.map(a => <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>)}</SelectContent>
+                </Select>
+                <Input className="h-8 text-xs" type="number" min={0} value={bulkTaskTarget} onChange={(e) => setBulkTaskTarget(e.target.value)} placeholder="Bulk target" />
+                <Input className="h-8 text-xs" type="date" value={bulkTaskDeadline} onChange={(e) => setBulkTaskDeadline(e.target.value)} />
+                <Input className="h-8 text-xs" value={bulkTaskNotes} onChange={(e) => setBulkTaskNotes(e.target.value)} placeholder="Bulk notes" />
+                <Button size="sm" className="h-8 text-xs" onClick={applyBulkToSelectedTasks}>Apply On Selected</Button>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="p-0">
             {nextMonthTasks.length > 0 ? (
               <Table>
-                <TableHeader><TableRow><TableHead>Task</TableHead><TableHead>Activity Type</TableHead><TableHead>Target</TableHead><TableHead>Deadline</TableHead><TableHead>Notes</TableHead>{isEditable && <TableHead className="w-10"></TableHead>}</TableRow></TableHeader>
+                <TableHeader><TableRow>{isEditable && <TableHead className="w-10">Sel</TableHead>}<TableHead>Task</TableHead><TableHead>Activity Type</TableHead><TableHead>Target</TableHead><TableHead>Deadline</TableHead><TableHead>Notes</TableHead>{isEditable && <TableHead className="w-10"></TableHead>}</TableRow></TableHeader>
                 <TableBody>
                   {nextMonthTasks.map((t, i) => (
                     <TableRow key={t.id}>
+                      {isEditable && (
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            checked={selectedTaskIds.includes(t.id)}
+                            onChange={(e) => toggleTaskSelection(t.id, e.target.checked)}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell>{isEditable ? <Input className="h-7 text-xs" value={t.taskName} onChange={e => handleUpdateTask(i, "taskName", e.target.value)} placeholder="Task name" /> : <span className="font-medium text-sm">{t.taskName}</span>}</TableCell>
                       <TableCell>{isEditable ? (
                         <Select value={t.activityType} onValueChange={val => handleUpdateTask(i, "activityType", val)}>
